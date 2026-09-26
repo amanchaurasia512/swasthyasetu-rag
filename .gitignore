@@ -2,5 +2,7 @@
 vectorstore/
 .venv/
 __pycache__/
- data/
- chroma_db/ 
+
+# Data folders
+data/
+chroma_db/
