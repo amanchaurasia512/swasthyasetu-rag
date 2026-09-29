@@ -10,3 +10,7 @@ chroma_db/
 
 #json file
 config/
+
+#created by tmol
+quality/
+swasthyasetu.egg-info/
