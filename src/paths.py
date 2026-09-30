@@ -18,9 +18,15 @@ PDF_PATH     = DATA_RAW / "Final Guideline on Human Resources for Health for NHM
 DEC_PATH     = CONFIG / "manual_decisions.json"
 PAGE_MAP_CSV = PROFILE / "page_map.csv"
 TABLE_INV    = PROFILE / "table_inventory.csv"
+TOC_CSV       = PROFILE / "toc.csv"      #created at step 15
+PAGES_OCR    = INTERIM / "pages_ocr.jsonl"  
 
 # ---------- pipeline files: who writes → who reads ----------
 PAGES_RAW    = INTERIM / "pages_raw.jsonl"      # step 12 writes → step 13 reads
 PAGES_CLEAN  = INTERIM / "pages_clean.jsonl"    # step 13 writes → step 14 reads
 PAGES_TABLES = INTERIM / "pages_tables.jsonl"   # step 14 writes → step 15 reads
 TABLES_DIR   = INTERIM / "tables"               # step 14 writes one CSV per table
+OCR_LINES    = INTERIM / "ocr_lines.jsonl"      #created at step 15 
+LETTERS_JSONL = INTERIM / "letters.jsonl"       #created at step 15
+
+
