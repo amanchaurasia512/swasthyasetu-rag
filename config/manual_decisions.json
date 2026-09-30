@@ -1,0 +1,96 @@
+{
+  "footer_top": 780,
+  "footnote_zone": 650,
+  "footnote_size": 8.5,
+  "superscript_max": 7.5,
+  "min_chars": 200,
+  "cover_pages": [
+    1
+  ],
+  "contents_pages": [
+    17,
+    18,
+    19,
+    20
+  ],
+  "glossary_pages": [
+    15,
+    16
+  ],
+  "form_pages": [
+    84,
+    85,
+    86,
+    87,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    105,
+    106,
+    107,
+    108
+  ],
+  "ocr_pages": [
+    5,
+    7,
+    9,
+    11,
+    13,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145
+  ],
+  "diagram_text": {
+    "32": "Exhibit 1: Key steps in the Process of Recruitment — 1. Identify and validate vacancies → ..."
+  },
+  "oddities": {
+    "90": "Air tickets booked by myself of both tickets Hyderabad"
+  },
+  "char_replacements": {
+    "’": "'",
+    "‘": "'",
+    "“": "\"",
+    "”": "\"",
+    "–": "-",
+    "—": " - ",
+    "•": "- ",
+    "√": "Yes"
+  }
+}

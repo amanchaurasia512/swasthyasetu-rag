@@ -15,11 +15,13 @@ QUALITY   = ROOT / "quality"
 DEC_PATH  = CONFIG / "manual_decisions.json"
 # ---------- inputs ----------
 PDF_PATH     = DATA_RAW / "Final Guideline on Human Resources for Health for NHM.pdf"
-DEC_PATH     = CONFIG / "manual_decisions.json"
+
 PAGE_MAP_CSV = PROFILE / "page_map.csv"
 TABLE_INV    = PROFILE / "table_inventory.csv"
 TOC_CSV       = PROFILE / "toc.csv"      #created at step 15
 PAGES_OCR    = INTERIM / "pages_ocr.jsonl"  
+PAGE_TYPES_CSV = PROFILE / "classify_pdf_pages.csv"   # notebook 01 writes (after the rename)
+
 
 # ---------- pipeline files: who writes → who reads ----------
 PAGES_RAW    = INTERIM / "pages_raw.jsonl"      # step 12 writes → step 13 reads
@@ -28,5 +30,6 @@ PAGES_TABLES = INTERIM / "pages_tables.jsonl"   # step 14 writes → step 15 rea
 TABLES_DIR   = INTERIM / "tables"               # step 14 writes one CSV per table
 OCR_LINES    = INTERIM / "ocr_lines.jsonl"      #created at step 15 
 LETTERS_JSONL = INTERIM / "letters.jsonl"       #created at step 15
+PAGES_FINAL    = INTERIM / "pages.jsonl"        # step 18 writes → step 20 reads
 
 
