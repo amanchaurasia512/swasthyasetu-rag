@@ -31,5 +31,6 @@ TABLES_DIR   = INTERIM / "tables"               # step 14 writes one CSV per tab
 OCR_LINES    = INTERIM / "ocr_lines.jsonl"      #created at step 15 
 LETTERS_JSONL = INTERIM / "letters.jsonl"       #created at step 15
 PAGES_FINAL    = INTERIM / "pages.jsonl"        # step 18 writes → step 20 reads
+SECTIONS     = INTERIM / "sections.jsonl"       #created at step 20
 
 
