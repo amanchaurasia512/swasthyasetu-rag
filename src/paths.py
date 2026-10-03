@@ -38,3 +38,6 @@ CHUNKS       = INTERIM / "chunks.jsonl"          #create at chunking step
 
 #-------vecror databse-----------------
 VECTOR_DB  = ROOT / "data" / "vectordb"   
+
+#---------Model----------------------
+MODELS_DIR    = ROOT / "models"

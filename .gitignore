@@ -7,7 +7,7 @@ __pycache__/
 data/
 chroma_db/
 
-
+data/vectordb
 
 #created by tmol
 quality/
