@@ -13,6 +13,7 @@ PROCESSED = ROOT / "data" / "processed"
 CONFIG    = ROOT / "config"
 QUALITY   = ROOT / "quality"
 DEC_PATH  = CONFIG / "manual_decisions.json"
+EVAL_DIR   = ROOT / "data" / "eval"
 # ---------- inputs ----------
 PDF_PATH     = DATA_RAW / "Final Guideline on Human Resources for Health for NHM.pdf"
 
@@ -32,5 +33,5 @@ OCR_LINES    = INTERIM / "ocr_lines.jsonl"      #created at step 15
 LETTERS_JSONL = INTERIM / "letters.jsonl"       #created at step 15
 PAGES_FINAL    = INTERIM / "pages.jsonl"        # step 18 writes → step 20 reads
 SECTIONS     = INTERIM / "sections.jsonl"       #created at step 20
-
+CHUNKS       = INTERIM / "chunks.jsonl"          #create at chunking step
 
