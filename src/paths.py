@@ -35,3 +35,6 @@ PAGES_FINAL    = INTERIM / "pages.jsonl"        # step 18 writes → step 20 rea
 SECTIONS     = INTERIM / "sections.jsonl"       #created at step 20
 CHUNKS       = INTERIM / "chunks.jsonl"          #create at chunking step
 
+
+#-------vecror databse-----------------
+VECTOR_DB  = ROOT / "data" / "vectordb"   

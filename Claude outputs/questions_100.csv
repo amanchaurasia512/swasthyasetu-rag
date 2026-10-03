@@ -1,0 +1,101 @@
+qid,question,pdf_page,phrase,type
+Q101,What is the full form of PFMS used for paying NHM salaries?,16,Public Financial Management System,acronym
+Q102,What does EAG stand for in the guideline?,15,Empowered Action Group,acronym
+Q103,When was the National Health Mission started and under what earlier name?,21,started in 2005 as,keyword
+Q104,How many extra health workers has NHM added over its first 15 years?,23,approximately 4.5 lakhs additional human resources,paraphrase
+Q105,Which support service staff should preferably be engaged through outsourcing?,24,include Data Entry Operators,keyword
+Q106,Where do bio-medical engineers and refrigerator mechanics fit among NHM staff categories?,24,Refrigerator Mechanics,paraphrase
+Q107,Should NHM human resources replace the existing regular staff?,25,NHM human resources should not replace,keyword
+Q108,Can salaries of NHM staff be compared across different states?,25,Inter-state comparison is not possible,paraphrase
+Q109,Is a competency-based skill test mandatory for front line workers?,26,Competency-based skill test for front,keyword
+Q110,How should the guideline fill gaps of skilled workers in remote rural pockets?,26,differential salaries and allowances,paraphrase
+Q111,What role should the SIHFW play according to the key HRH strategies?,27,Revive and strengthen the Apex body for training,acronym
+Q112,For how long can an NHM contract be given at a time?,28,three years at a time,keyword
+Q113,How long can a student work with the State Health Society as an intern?,29,1month to 1 year,paraphrase
+Q114,How is the monthly fee of a retired government official hired as a consultant usually fixed?,29,pay minus pension,keyword
+Q115,Within how many days should recruitment be completed from identifying the vacancy to announcing results?,31,45-60 days,keyword
+Q116,Which states have set up a separate board to hire health staff?,31,separate Recruitment Board for Health,paraphrase
+Q117,Why is recruitment through the State Public Service Commission a problem?,31,recruitment cycle in most cases is exceedingly long,keyword
+Q118,"In Exhibit 2, which selection stage is used only for service delivery staff?",34,,table
+Q119,Is a written exam always needed when hiring specialists?,34,may not be required in case of specialists,paraphrase
+Q120,What shortlisting ratio should be aimed for programme management posts that head a division?,35,a minimum ratio of 3:1,keyword
+Q121,Can selection results be announced before certificates are verified?,35,even if document verification is pending,paraphrase
+Q122,For which posts is a reference check compulsory?,35,reference check be carried out for all supervisory posts,keyword
+Q123,What details should be printed on an NHM employee's identity card?,38,blood group and emergency contact number,keyword
+Q124,Who can help a new recruit settle into the team during the first weeks?,38,A peer-mentor or a buddy,paraphrase
+Q125,Can the probation period of NHM staff be extended?,38,extended for another three months,keyword
+Q126,How many days should induction training last?,39,three to five days at a stretch,keyword
+Q127,How many weeks does SBA training take?,40,Skill Birth Attendant (SBA) training for three weeks,acronym
+Q128,What minimum training fee per employee is allowed for skill enhancement training?,40,"training fee of Rs.10,000",keyword
+Q129,Which staff get to pick a training of their choice after their appraisal?,41,A+ or A category,paraphrase
+Q130,Should states run a separate TMIS for training records?,41,No separate TMIS,acronym
+Q131,"On average, how much is budgeted for annual increments of NHM staff?",43,budgeted on an average at 5%,keyword
+Q132,"Apart from money, how can good work by staff be recognised?",43,The reward need not be monetary,paraphrase
+Q133,What is the maximum annual increment if a State is undertaking HR rationalization?,44,maximum of 15%,keyword
+Q134,How has Odisha grouped its health institutions for place-based incentives?,45,categorised all its health institutions into 5 types,paraphrase
+Q135,After how many years of service can NHM staff become eligible for an experience bonus?,45,experience bonus after completion of either 3 years or 5,keyword
+Q136,Will staff who serve in the hardest-to-reach places later get a posting of their choice?,45,10-20% facilities,paraphrase
+Q137,How much weightage can NHM staff get when applying for jobs in the health department?,46,up to 25%,keyword
+Q138,Are routine transfers allowed for NHM employees?,46,should not be subjected to any routine transfers,paraphrase
+Q139,Must exit interviews be held with every employee leaving NHM?,47,Exit interviews must be conducted,keyword
+Q140,Which committee handles complaints of sexual harassment at the workplace?,49,Internal Complaints Committee,paraphrase
+Q141,Who approves staff appointed on deputation to the SHS?,50,Mission Director shall be the approving authority,keyword
+Q142,Can doctors or nurses be brought into NHM on deputation?,50,No posts under service delivery HRH,paraphrase
+Q143,What relaxations may the State Selection Committee consider for candidates?,53,current employment under,keyword
+Q144,What must an obstetrics and gynaecology specialist provide round the clock?,54,Round the clock provision of Caesarean deliveries,paraphrase
+Q145,How often should a staff nurse attend to a patient's pressure points?,60,pressure points of the patient four hourly,paraphrase
+Q146,Who prepares the District Health Action Plan according to the DPM's job responsibilities?,66,prepare the District Health Action Plan,acronym
+Q147,How long should the written test in the selection process be?,71,nearly an hour,keyword
+Q148,Who should sit on the interview panel for NHM recruitment?,72,one woman panellist,paraphrase
+Q149,How are weightage points for educational qualification calculated?,72,educational qualification is 60 and candidate has 70,keyword
+Q150,What should the offer letter say about the type of recruitment?,73,Type of recruitment,keyword
+Q151,What does the confidentiality clause in an NHM contract require?,74,Agreement of confidentiality,keyword
+Q152,How much notice is needed to end an NHM contract appointment?,76,one month's notice,paraphrase
+Q153,Can an NHM contract employee take up another job during the contract?,77,part time/full time employment,keyword
+Q154,When should the October performance assessment be completed?,80,to be completed before 31st October,keyword
+Q155,Which employees get priority for in-service training when there are too many trainees?,79,high priority districts,paraphrase
+Q156,What gap is recommended between two training courses?,79,gap of 3-6 months,keyword
+Q157,How much of a travel advance is credited after finance approves it?,88,80% amount should be credited,paraphrase
+Q158,Can an employee take a day off after a week-long work trip that included weekends?,89,Compensatory Off,paraphrase
+Q159,What increment is suggested for a staff member rated 3 (satisfactory) in the appraisal?,99,Satisfactory,table
+Q160,On which day should the monthly salary be paid?,100,Disbursement should be done on the 1st,keyword
+Q161,Within how many days must a grievance be sent from the facility to the district committee?,103,within seven days of receipt of the grievance,keyword
+Q162,When will a leaving employee get the relieving letter and full and final settlement?,104,not later than two weeks after,paraphrase
+Q163,Which letter stressed competency based assessment in recruitment of NHM staff?,109,,letter
+Q164,What did the Ministry say about open source software and open APIs for HRMIS?,110,,letter
+Q165,Should a GoI or NHSRC observer be present during NHM recruitment interviews?,111,,letter
+Q166,What share of required specialists were in position at Community Health Centres?,113,,letter
+Q167,Are State Health Societies covered by the Employees Provident Fund Act after the exemption expired?,118,,letter
+Q168,Which body approved applying the health systems approach to NHM HR in March 2016?,120,,letter
+Q169,How should the remuneration of existing Data Entry Operators be paid?,122,,letter
+Q170,What did the December 2016 letter send to the states for HR integration?,123,,letter
+Q171,How many HR recruitment agencies were empanelled to help states with recruitment?,124,,letter
+Q172,How can doctors posted in remote rural areas avoid feeling professionally isolated?,126,,paraphrase
+Q173,Does the Supreme Court's equal pay for equal work judgment raise NHM contractual salaries?,127,,unreadable
+Q174,What increase is allowed if a proposed salary was not approved by the State EC and GB?,131,,letter
+Q175,Which states got prototype HR advertisements to attract skilled professionals?,132,,unreadable
+Q176,Why was the experience bonus introduced for NHM staff?,133,,paraphrase
+Q177,Where should male MPWs be placed according to the January 2019 letter?,134,,letter
+Q178,From which date is the status of MPHW posts taken as the benchmark for support?,137,,letter
+Q179,"What is the 'You bid, we pay' approach for hiring doctors?",140,,paraphrase
+Q180,Does the ESI Act apply to NHM staff?,141,,acronym
+Q181,Should the minimum performance benchmarks be part of programme management staff contracts?,143,,letter
+Q182,About how many programme management HR have been approved under NHM?,144,,letter
+Q183,How is data on regular staff cross-checked in Chhattisgarh's HR information system?,148,cross-checked with the official treasury records,keyword
+Q184,How much did Chhattisgarh spend on setting up its HR information system?,148,Minimal cost has been incurred,paraphrase
+Q185,What is Swasthya Sewa Dapoon?,147-148,,keyword
+Q186,When are NHM salaries paid under Assam's HR-MIS system?,149,within the last week of,paraphrase
+Q187,What did Madhya Pradesh start in 2016-17 to fix the accountability of health providers?,150,backtracking the cases of severe,keyword
+Q188,How many show cause notices were issued to ANMs in Madhya Pradesh in 2016-17?,151,84 show cause notices,keyword
+Q189,Who did the post-training assessment of ANMs in Madhya Pradesh?,151,Clinton Health Access Initiative,acronym
+Q190,How did vacancies of doctors in KBK+ districts of Odisha change in 2015-16?,153,45.51% to 32.75%,keyword
+Q191,What rule helps Odisha keep doctors in remote and rural areas?,153,three-year tenure,paraphrase
+Q192,What share of Bijapur district's population is tribal?,153,74% of the population,keyword
+Q193,What happened to contractual staff in Madhya Pradesh who scored below 54% in the appraisal?,156,termination notices,paraphrase
+Q194,What was the C-section rate in Banka district before the person-centred care approach?,158,Low C section rate 1.02%,keyword
+Q195,Which states are given as examples of having a separate public health cadre?,163,"Maharashtra, Odisha and Tamil Nadu",paraphrase
+Q196,How long is pre-service training for health workers in Tamil Nadu's public health cadre?,163,Three months pre-service training,keyword
+Q197,How much did Kangaroo Mother Care initiation improve under AMANAT?,165,30.9% to 62.5%,acronym
+Q198,What incentive did specialist mentors get for visiting FRUs in UP's buddy model?,167,2500 per specialist per visit,paraphrase
+Q199,For what term are contractual staff engaged in Odisha's P4P model?,168,contractual term of 11 months,keyword
+Q200,What welfare measures exist for NHM staff under Odisha's P4P model?,169,NHM Employees Welfare Fund,paraphrase
