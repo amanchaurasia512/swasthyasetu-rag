@@ -35,6 +35,7 @@ COLLECTION   = "hrh_chunks_bge_small"
 HYBRID_POOL  = 50      # top-N taken from BM25 and from vector search before fusing
 RRF_C        = 60      # reciprocal rank fusion: score = sum of 1 / (RRF_C + rank)
 RERANK_POOL  = 20      # the reranker re-reads the hybrid's top-N
+KEEP_WITHIN  =  3      # the hybrid's #1 is never pushed below this rank by the reranker
 
 STOP = set("""a an the of to in on for and or is are was were be been by with as at from that this these those it its
 what which who whom how why when where does do did should shall can could will would may might must about into than
@@ -141,11 +142,23 @@ class Retriever:
         top = sorted(fused, key=fused.get, reverse=True)[:k]
         return [(i, fused[i]) for i in top]
 
+    # def _rerank(self, question: str, k: int):
+    #     cands  = [i for i, _ in self._hybrid(question, RERANK_POOL)]
+    #     scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))
+    #     order  = np.argsort(-scores, kind="stable")[:k]
+    #     return [(cands[j], float(scores[j])) for j in order]
     def _rerank(self, question: str, k: int):
         cands  = [i for i, _ in self._hybrid(question, RERANK_POOL)]
         scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))
-        order  = np.argsort(-scores, kind="stable")[:k]
-        return [(cands[j], float(scores[j])) for j in order]
+        order  = np.argsort(-scores, kind="stable")
+        ranked = [(cands[j], float(scores[j])) for j in order]
+        # safeguard: if BM25 + vectors agreed on a #1 chunk, the reranker may not push it out of the top 5
+        keep = min(KEEP_WITHIN, k)
+        top  = next(x for x in ranked if x[0] == cands[0])
+        if ranked.index(top) >= keep:
+            ranked.remove(top)
+            ranked.insert(keep - 1, top)
+        return ranked[:k]
 
     # ------------------------------------------------------------------ public
     def ranked(self, question: str, k: int = 5, method: str = "rerank"):
