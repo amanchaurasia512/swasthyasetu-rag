@@ -21,26 +21,42 @@ from pathlib import Path
 
 import numpy as np
 
+# from src.paths import CHUNKS
+
+# # --- where things live (data/interim/chunks.jsonl -> project root is 2 folders up) ---
+# ROOT          = CHUNKS.parents[2]
+# VECTOR_DB_DIR = ROOT / "data" / "vectordb"
+# MODELS_DIR    = ROOT / "models"
+
+# # --- the settings that were tested in notebook 08 ---
+# EMBED_MODEL  = "BAAI/bge-small-en-v1.5"
+# RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
+# COLLECTION   = "hrh_chunks_bge_small"
+# HYBRID_POOL  = 50      # top-N taken from BM25 and from vector search before fusing
+# RRF_C        = 60      # reciprocal rank fusion: score = sum of 1 / (RRF_C + rank)
+# RERANK_POOL  = 20      # the reranker re-reads the hybrid's top-N
+# KEEP_WITHIN  =  3      # the hybrid's #1 is never pushed below this rank by the reranker
+
+# STOP = set("""a an the of to in on for and or is are was were be been by with as at from that this these those it its
+# what which who whom how why when where does do did should shall can could will would may might must about into than
+# there their they them his her he she we our you your i my me not no any all""".split())
+
+"""STC was appiled in table chunk so chunk was changed we made vector databse in module to s re-run in the notebook"""
+
 from src.paths import CHUNKS
+from src.vectordb import (COLLECTION, MODELS_DIR, VECTOR_DB_DIR, load_chunks, load_embedder,  # noqa: F401
+                          open_collection, unit_of)
 
-# --- where things live (data/interim/chunks.jsonl -> project root is 2 folders up) ---
-ROOT          = CHUNKS.parents[2]
-VECTOR_DB_DIR = ROOT / "data" / "vectordb"
-MODELS_DIR    = ROOT / "models"
-
-# --- the settings that were tested in notebook 08 ---
-EMBED_MODEL  = "BAAI/bge-small-en-v1.5"
+# --- the settings that were tested in notebook 08 (vector DB settings live in src/vectordb.py) ---
 RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
-COLLECTION   = "hrh_chunks_bge_small"
 HYBRID_POOL  = 50      # top-N taken from BM25 and from vector search before fusing
 RRF_C        = 60      # reciprocal rank fusion: score = sum of 1 / (RRF_C + rank)
 RERANK_POOL  = 20      # the reranker re-reads the hybrid's top-N
-KEEP_WITHIN  =  3      # the hybrid's #1 is never pushed below this rank by the reranker
+KEEP_WITHIN  = 5       # the hybrid's #1 is never pushed below this rank by the reranker
 
 STOP = set("""a an the of to in on for and or is are was were be been by with as at from that this these those it its
 what which who whom how why when where does do did should shall can could will would may might must about into than
 there their they them his her he she we our you your i my me not no any all""".split())
-
 
 def load_chunks(path: Path = CHUNKS) -> list[dict]:
     with open(path, encoding="utf-8") as f:
@@ -68,7 +84,7 @@ class Retriever:
         self.db_dir      = Path(db_dir)
         self.collection_name = collection
         self._stem       = snowballstemmer.stemmer("english").stemWord
-        self._embedder   = None        # models are loaded on first use (lazy)
+        self._embedder   = None       
         self._reranker   = None
 
         self.bm25 = BM25Okapi([self.tokenize(c["embed_text"]) or ["_empty_"] for c in self.chunks])
@@ -80,13 +96,19 @@ class Retriever:
         return [self._stem(w) for w in words if w not in STOP]
 
     # ------------------------------------------------------------------ models, loaded only when needed
+    # @property  #older emmber 
+    # def embedder(self):
+    #     if self._embedder is None:
+    #         from fastembed import TextEmbedding
+    #         self._embedder = TextEmbedding(EMBED_MODEL, cache_dir=str(self.models_dir))
+    #     return self._embedder
+
     @property
     def embedder(self):
         if self._embedder is None:
-            from fastembed import TextEmbedding
-            self._embedder = TextEmbedding(EMBED_MODEL, cache_dir=str(self.models_dir))
+            self._embedder = load_embedder(self.models_dir)
         return self._embedder
-
+    
     @property
     def reranker(self):
         if self._reranker is None:
@@ -102,25 +124,34 @@ class Retriever:
                 "printed_pages": ",".join(str(p) for p in c["printed_pages"] if p is not None),
                 "path": " > ".join(c["path"])}
 
+    # def _open_collection(self, rebuild: bool = False):
+    #     """Open the ChromaDB collection; (re)build it if it is missing or does not match chunks.jsonl."""
+    #     import chromadb
+    #     client = chromadb.PersistentClient(path=str(self.db_dir))
+    #     col = client.get_or_create_collection(name=self.collection_name, embedding_function=None,
+    #                                           metadata={"hnsw:space": "cosine"})
+    #     ids = [c["chunk_id"] for c in self.chunks]
+    #     if rebuild or set(col.get(include=[])["ids"]) != set(ids):
+    #         client.delete_collection(self.collection_name)
+    #         col = client.create_collection(name=self.collection_name, embedding_function=None,
+    #                                        metadata={"hnsw:space": "cosine"})
+    #         vectors = np.array(list(self.embedder.passage_embed([c["embed_text"] for c in self.chunks])))
+    #         col.add(ids=ids, embeddings=vectors.tolist(),
+    #                 documents=[c["text"] for c in self.chunks],
+    #                 metadatas=[self._metadata(c) for c in self.chunks])
+    #     return col
+
+    # def rebuild_vector_db(self):
+    #     """Call after chunks.jsonl changes (new chunking or new embedding model)."""
+    #     self.collection = self._open_collection(rebuild=True)
+
+    # ------------------------------------------------------------------ vector database (src/vectordb.py)
     def _open_collection(self, rebuild: bool = False):
-        """Open the ChromaDB collection; (re)build it if it is missing or does not match chunks.jsonl."""
-        import chromadb
-        client = chromadb.PersistentClient(path=str(self.db_dir))
-        col = client.get_or_create_collection(name=self.collection_name, embedding_function=None,
-                                              metadata={"hnsw:space": "cosine"})
-        ids = [c["chunk_id"] for c in self.chunks]
-        if rebuild or set(col.get(include=[])["ids"]) != set(ids):
-            client.delete_collection(self.collection_name)
-            col = client.create_collection(name=self.collection_name, embedding_function=None,
-                                           metadata={"hnsw:space": "cosine"})
-            vectors = np.array(list(self.embedder.passage_embed([c["embed_text"] for c in self.chunks])))
-            col.add(ids=ids, embeddings=vectors.tolist(),
-                    documents=[c["text"] for c in self.chunks],
-                    metadatas=[self._metadata(c) for c in self.chunks])
-        return col
+        """Open the ChromaDB collection; it is rebuilt when it is not in step with chunks.jsonl."""
+        return open_collection(self.chunks, lambda: self.embedder, self.db_dir, self.collection_name, rebuild)
 
     def rebuild_vector_db(self):
-        """Call after chunks.jsonl changes (new chunking or new embedding model)."""
+        """Embed every chunk again (normally not needed: a changed chunks.jsonl is noticed by itself)."""
         self.collection = self._open_collection(rebuild=True)
 
     # ------------------------------------------------------------------ the four searches → [(row, score)]
@@ -147,6 +178,7 @@ class Retriever:
     #     scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))
     #     order  = np.argsort(-scores, kind="stable")[:k]
     #     return [(cands[j], float(scores[j])) for j in order]
+    
     def _rerank(self, question: str, k: int):
         cands  = [i for i, _ in self._hybrid(question, RERANK_POOL)]
         scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))
