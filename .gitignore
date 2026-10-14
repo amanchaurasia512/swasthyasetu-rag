@@ -18,8 +18,19 @@ swasthyasetu.egg-info/
 models/
 
 #notebook
-notebooks/11_benchmark_test.ipynb  
+notebooks/11_benchmark_test.ipynb
+notebooks/15_prompt_ab.ipynb
 
 
 #API_key
  .env
+
+
+#model
+ notebooks/ollama.log
+
+#githuhptah
+GitHub_token github_pat_11AV2L2EI0L.txt
+
+#ollama.log
+notebooks/ollama.log

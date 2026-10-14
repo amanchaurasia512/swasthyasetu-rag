@@ -24,7 +24,11 @@ import requests
 
 from src.ollama_server import OLLAMA_URL, OllamaError, ensure_ollama
 
-API = {"groq": ("https://api.groq.com/openai/v1/chat/completions", "GROQ_API_KEY")}
+API = {"groq": ("https://api.groq.com/openai/v1/chat/completions", "GROQ_API_KEY"),
+       "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "GEMINI_API_KEY"),
+       "nvidia": ("https://integrate.api.nvidia.com/v1/chat/completions", "NVIDIA_API_KEY"),
+       "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
+API_MAX_TOKENS = 2048                          # room for long lists and for a reasoning model's short thinking
 OPTIONS = {"temperature": 0, "num_ctx": 4096, "num_predict": 512}
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
@@ -51,11 +55,47 @@ def _ollama(name: str, messages: list[dict], timeout: int):
     return reply, (lambda response: response.json()["message"]["content"])
 
 
+# def api_text(response) -> str:
+#     """OpenAI-style JSON reply -> its message text. Anything else is NOT an answer (a dead service can reply 'OK')."""
+#     if "json" not in response.headers.get("content-type", ""):
+#         raise LLMError(f"not a model reply (content-type {response.headers.get('content-type')!r}): {response.text[:100]!r}")
+#     return response.json()["choices"][0]["message"]["content"]
+
+
+# def _api(provider: str, name: str, messages: list[dict], timeout: int):
+#     url, key_name = API[provider]
+#     key = os.environ.get(key_name, "")
+#     if not key:
+#         raise LLMError(f"{key_name} is not set - add it to .env (laptop) or the notebook secrets")
+#     payload = {"model": name, "messages": messages, "temperature": 0, "max_tokens": OPTIONS["num_predict"]}
+#     if "gpt-oss" in name:                      # reasoning model: think briefly and leave room for the answer
+#         payload.update({"reasoning_effort": "low", "max_tokens": 2048})
+#     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}
+#     reply = requests.post(url, json=payload, timeout=timeout, headers=headers)
+#     return reply, api_text
+
+# def _api(provider: str, name: str, messages: list[dict], timeout: int):
+#     url, key_name = API[provider]
+#     key = os.environ.get(key_name, "")
+#     if not key:
+#         raise LLMError(f"{key_name} is not set - add it to .env (laptop) or the notebook secrets")
+#     payload = {"model": name, "messages": messages, "temperature": 0, "max_tokens": OPTIONS["num_predict"]}
+#     if "gpt-oss" in name:                      # reasoning model: think briefly and leave room for the answer
+#         payload.update({"reasoning_effort": "low", "max_tokens": 2048})
+#     if provider == "gemini":                   # Gemini 3.x thinks by default: keep it low, leave room for long lists
+#         payload.update({"reasoning_effort": "low", "max_tokens": 4096})
+#     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}
+#     reply = requests.post(url, json=payload, timeout=timeout, headers=headers)
+#     return reply, api_text
+
 def api_text(response) -> str:
     """OpenAI-style JSON reply -> its message text. Anything else is NOT an answer (a dead service can reply 'OK')."""
     if "json" not in response.headers.get("content-type", ""):
         raise LLMError(f"not a model reply (content-type {response.headers.get('content-type')!r}): {response.text[:100]!r}")
-    return response.json()["choices"][0]["message"]["content"]
+    data = response.json()
+    if not data.get("choices"):
+        raise LLMError(f"no answer in the reply: {str(data.get('error', data))[:200]}")
+    return data["choices"][0]["message"].get("content") or ""
 
 
 def _api(provider: str, name: str, messages: list[dict], timeout: int):
@@ -63,13 +103,14 @@ def _api(provider: str, name: str, messages: list[dict], timeout: int):
     key = os.environ.get(key_name, "")
     if not key:
         raise LLMError(f"{key_name} is not set - add it to .env (laptop) or the notebook secrets")
-    payload = {"model": name, "messages": messages, "temperature": 0, "max_tokens": OPTIONS["num_predict"]}
+    payload = {"model": name, "messages": messages, "temperature": 0, "max_tokens": API_MAX_TOKENS}
     if "gpt-oss" in name:                      # reasoning model: think briefly and leave room for the answer
-        payload.update({"reasoning_effort": "low", "max_tokens": 2048})
+        payload["reasoning_effort"] = "low"
+    if provider == "gemini":                   # Gemini 3.x thinks by default: keep it low, leave room for long lists
+        payload.update({"reasoning_effort": "low", "max_tokens": 4096})
     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}
     reply = requests.post(url, json=payload, timeout=timeout, headers=headers)
     return reply, api_text
-
 
 def chat(model: str, system: str, user: str, timeout: int = 300, tries: int = 3) -> str:
     """Send one system + user message, return the reply text.
