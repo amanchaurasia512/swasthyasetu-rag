@@ -139,13 +139,18 @@ def chat(model: str, system: str, user: str, timeout: int = 300, tries: int = 3)
     raise LLMError(f"{model} gave no answer after {tries} tries | {problem}")
 
 
-def real_answer_check(model: str) -> str:
+# def real_answer_check(model: str) -> str:
+#     """17 + 25 must give 42. A dead or fake endpoint ('OK', empty, an error page) fails here, before a long run."""
+#     reply = chat(model, "Answer with the number only.", "What is 17 + 25?")
+#     if not re.search(r"\b42\b", reply):
+#         raise LLMError(f"{model} failed the real-answer check: 17 + 25 -> {reply[:100]!r}")
+#     return reply
+def real_answer_check(model: str, timeout: int = 300, tries: int = 3) -> str:
     """17 + 25 must give 42. A dead or fake endpoint ('OK', empty, an error page) fails here, before a long run."""
-    reply = chat(model, "Answer with the number only.", "What is 17 + 25?")
+    reply = chat(model, "Answer with the number only.", "What is 17 + 25?", timeout, tries)
     if not re.search(r"\b42\b", reply):
         raise LLMError(f"{model} failed the real-answer check: 17 + 25 -> {reply[:100]!r}")
     return reply
-
 
 class FakeAnswerGuard:
     """Stops a long run when the model keeps sending the SAME text (e.g. 288 x 'OK').

@@ -19,7 +19,7 @@ models/
 
 #notebook
 notebooks/11_benchmark_test.ipynb
-notebooks/15_prompt_ab.ipynb
+
 
 
 #API_key

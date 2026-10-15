@@ -19,8 +19,10 @@ import pandas as pd
 
 TAU = 0.5                                   # a fact set counts as covered when at least this share is found
 NOT_FOUND = "Not found in the guideline."
-REFUSAL_PHRASES = ("not found in the guideline", "does not cover", "do not cover", "does not mention",
-                   "do not mention", "not covered", "no information")
+REFUSAL_PHRASES = ("not found in the guideline", "does not cover", "do not cover", "does not mention", "do not mention",
+                   "not covered", "no information", "not in the guideline", "not given", "not mentioned", "no mention",
+                   "do not contain", "does not contain")
+REFUSE_FIRST_COUNTS = False   # Option 1 (strict). True = Option 2: "Not covered for X; the guideline gives Y for Z" is a refusal
 LONG_REQUEST = re.compile(r"\b(list|all|steps?|process|procedure|forms?|format|letters?|message|explain|describe|"
                           r"components?|responsibilit\w*|duties|contents?|roadmap|phases?)\b", re.I)
 STOP_WORDS = set("""the a an and or of to in on for by with from as at is are be this that these those it its which what who
@@ -54,11 +56,18 @@ def found_in(fact_list: list[str], text) -> list[str]:
 
 
 # ---------------------------------------------------------------- answer parts
+def first_sentence(text: str) -> str:
+    return re.split(r"(?<=[.!?;])\s", text, maxsplit=1)[0]
+
+
 def refused(answer, action: str = "answer") -> bool:
-    """A gate reply, the exact NOT_FOUND text, or a SHORT reply built around a refusal phrase."""
+    """A gate reply; the exact NOT_FOUND text at the start or the end; a SHORT reply built around a refusal phrase;
+    with REFUSE_FIRST_COUNTS also any reply whose first sentence is a refusal."""
     text = str(answer).strip().lower()
-    return (action in ("reject", "scoped") or text.startswith(NOT_FOUND.lower())
-            or (len(text.split()) <= 25 and any(phrase in text for phrase in REFUSAL_PHRASES)))
+    short_refusal = len(text.split()) <= 25 and any(phrase in text for phrase in REFUSAL_PHRASES)
+    opens_with_refusal = any(phrase in first_sentence(text) for phrase in REFUSAL_PHRASES)
+    return (action in ("reject", "scoped") or text.startswith(NOT_FOUND.lower()) or text.endswith(NOT_FOUND.lower())
+            or short_refusal or (REFUSE_FIRST_COUNTS and opens_with_refusal))
 
 
 def answer_mode(question) -> str:
