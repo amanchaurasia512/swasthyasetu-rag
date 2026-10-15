@@ -75,24 +75,6 @@ def answer_mode(question) -> str:
     return "long" if LONG_REQUEST.search(str(question)) else "short"
 
 
-def statements(answer) -> list[tuple[str, list[int]]]:
-    """Answer -> (statement text, cited source numbers). Lines are split into sentences; a sentence without its
-    own [n] takes the citations of the next cited sentence on the same line ("… fact. … fact [2]")."""
-    result = []
-    for line in str(answer).split("\n"):
-        pending = []
-        for sentence in re.split(r"(?<=[.!?])\s+(?=[A-Z])", line):
-            text = re.sub(r"\[\d+\]", "", sentence).strip(" -*•|#")
-            if len(key_words(text)) < 2 and not (key_words(text) and numbers(text)):
-                continue
-            cites = [int(n) for n in re.findall(r"\[(\d+)\]", sentence)]
-            pending.append(text)
-            if cites:
-                result += [(item, cites) for item in pending]
-                pending = []
-        result += [(item, []) for item in pending]
-    return result
-
 
 def bullet_count(answer) -> int:
     return len(re.findall(r"^\s*(?:[-*•]|\d+[.)]|\|)", str(answer), flags=re.M))
