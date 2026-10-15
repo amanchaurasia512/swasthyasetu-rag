@@ -191,3 +191,57 @@ def statements(answer) -> list[tuple[str, list[int]]]:
                 pending = []
         result += [(item, []) for item in pending]
     return result
+
+# ---------------------------------------------------------------- Phase 2, step 1b: scoring from a file (C-004)
+SCORING_COLUMNS = ["model", "version", "format", "run", "qid", "answer", "source", "label",
+                   "question", "action", "expected", "prompt", "sources"]
+
+
+def load_scoring_input(path) -> pd.DataFrame:
+    """Saved answers with their question data, sources and exact prompt (e.g. e2_scoring_input.jsonl)."""
+    return pd.read_json(path, lines=True, dtype=False)
+
+
+def select(rows: pd.DataFrame, pairs, qids, fmt: str = "f0", max_run: int = 2) -> pd.DataFrame:
+    """Rows of the planned (model, version) pairs on the given questions, one format, runs 1..max_run."""
+    planned = (rows.model + " | " + rows.version).isin({f"{model} | {version}" for model, version in pairs})
+    return rows[planned & rows.qid.isin(set(qids)) & rows.format.eq(fmt) & rows.run.le(max_run)]
+
+
+def scorecard(scored: pd.DataFrame) -> pd.Series:
+    """The three numbers the goal depends on (notebook 15.15)."""
+    refused = scored.refused.astype(bool)
+    answerable, unanswerable = scored.llm_label.eq("answerable"), scored.llm_label.eq("unanswerable")
+    correct = ~refused & scored.correctness.astype(float).fillna(0).ge(TAU)
+    cited = scored.cite_recall.astype(float)[~refused].dropna()
+    return pd.Series({"correct on answerable %": 100 * correct[answerable].mean(),
+                      "over-answer on unanswerable %": 100 * (~refused)[unanswerable].mean(),
+                      "statements cited %": 100 * cited.mean(),
+                      "answers": len(scored)})
+
+
+def scorecards(scored: pd.DataFrame) -> pd.DataFrame:
+    """One scorecard row per model and prompt version."""
+    return scored.groupby(["model", "version"]).apply(scorecard)
+
+
+def trade_off(scored: pd.DataFrame, models, versions, retrieval_miss_qids=frozenset(), accepted_corrections=frozenset(),
+              p_answerable: float = 0.7, k_values=(1, 2, 3), chosen_k: int = 3):
+    """Expected cost per 100 questions: p * missed answers + (1 - p) * real over-answers * k (notebook 15, trade-off cell).
+    Returns the table sorted by cost at chosen_k and the selected (model, version)."""
+    cards = scorecards(scored)
+    rows = scored[scored["model"].isin(models) & scored["version"].isin(versions)]
+    unanswerable = rows[(rows["llm_label"] == "unanswerable") & ~rows["qid"].isin(retrieval_miss_qids)]
+    real_over_answer = ~unanswerable["refused"] & ~unanswerable["qid"].isin(accepted_corrections)
+    over_rate = real_over_answer.groupby([unanswerable["model"], unanswerable["version"]]).mean()
+    table = cards.loc[over_rate.index, ["correct on answerable %", "statements cited %"]].copy()
+    table["real over-answer %"] = (100 * over_rate).round(1)
+    miss_cost = 100 * p_answerable * (1 - table["correct on answerable %"] / 100)
+    over_cost = 100 * (1 - p_answerable) * over_rate
+    for k in k_values:
+        table[f"cost k={k}"] = (miss_cost + over_cost * k).round(1)
+    table = table.sort_values([f"cost k={chosen_k}", "statements cited %"], ascending=[True, False])
+    selected = table.index[0]
+    table["beats selected if k <"] = ((miss_cost[selected] - miss_cost) / (over_cost - over_cost[selected])
+                                      ).where(over_cost > over_cost[selected]).round(2)
+    return table, selected
