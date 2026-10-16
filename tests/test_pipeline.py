@@ -31,9 +31,9 @@ def questions():
 
 
 @pytest.fixture(scope="module")
-def records(questions):
-    gate = pipeline.open_gate(CONFIG)
-    return {question["qid"]: pipeline.prepare(question, gate) for question in questions}
+def records(prepared):
+    """pipeline.prepare() on every question (shared with test_retrieval.py, see conftest.py)."""
+    return prepared
 
 
 def test_same_173_questions_in_the_same_order(questions, frozen):

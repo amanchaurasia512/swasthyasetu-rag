@@ -21,14 +21,14 @@ def frozen():
 
 
 @pytest.fixture(scope="module")
-def retriever():
-    return Retriever()
+def retriever(gate):
+    return gate.R
 
 
 @pytest.fixture(scope="module")
-def fresh(frozen, retriever):
-    gate = Corrective(retriever, SpellFixer(retriever.chunks))
-    return {record["qid"]: gate.prepare(record["question"]) for record in frozen}
+def fresh(prepared):
+    """Corrective.prepare() on every question (shared with test_pipeline.py, see conftest.py)."""
+    return prepared
 
 
 def differences(frozen, fresh, read):
