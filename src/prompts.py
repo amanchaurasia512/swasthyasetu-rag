@@ -1,0 +1,85 @@
+"""SwasthyaSetu prompts: system prompt versions, weak-evidence notes and source formats (moved from notebook 15.3b).
+build(record, version, fmt) -> (system, user prompt). A record is one frozen-evidence question:
+it needs 'fixed' (question), 'hits' (sources), 'final' (gate grade) and 'signals'."""
+from src import answer as answer_mod
+from src.corrective import Corrective
+
+FORMAT_RULES = """When you answer:
+- Use ONLY these sources. No outside knowledge, no guessing.
+- After each fact, and after each bullet, write the number of the source you read it in, e.g. [4].
+- Tables: read row by row and keep each value with its row and column names. For "only" questions, choose rows where that column is Yes and the other columns are No.
+- Length: for a single fact, answer in 1-3 sentences. When the question asks for a list, steps, a process, a form, a letter or "all" items, give every item from the sources as a bullet list."""
+
+SYSTEM_V3B_MED = f"""You answer questions about the "Guidelines on Human Resources for Health for NHM (2022)".
+First decide how to answer. Check these in order and use the FIRST that applies:
+1. The question is about an organisation, place or topic the sources do not mention: reply only "The guideline does not cover <it>." Do not add NHM rules.
+2. The question states something as true that the sources contradict: correct it with the value the sources state.
+3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply only "The guideline does not cover this for <the one asked>." Do not give the other one's value.
+4. The sources answer only part of the question: answer that part, then say which part the guideline does not cover.
+5. None of the sources contains any answer: reply exactly: {answer_mod.NOT_FOUND}
+6. Otherwise answer the question.
+{FORMAT_RULES}"""
+
+SYSTEM_V3B_STRICT = f"""You answer questions about the "Guidelines on Human Resources for Health for NHM (2022)".
+First decide how to answer. Check these in order and use the FIRST that applies:
+1. The question is about an organisation, place or topic the sources do not mention: reply exactly: {answer_mod.NOT_FOUND}
+2. The question states something as true that the sources contradict: correct it, but only if a source states the correct value directly; otherwise reply exactly: {answer_mod.NOT_FOUND}
+3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply exactly: {answer_mod.NOT_FOUND}
+4. The sources do not state the answer to EVERY part of the question: reply exactly: {answer_mod.NOT_FOUND}
+5. Otherwise answer the question.
+{FORMAT_RULES}"""
+
+
+def notes_v3b_med(sig):
+    """Weak-evidence notes that agree with SYSTEM_V3B_MED (refuse the out-of-scope part, never fill it with NHM rules)."""
+    notes = []
+    if sig["soft_out"]:
+        names = ", ".join(sig["soft_out"])
+        notes.append(f"The sources do not mention {names}. If the question is about {names}, reply only: The guideline does not cover {names}.")
+    if sig["missing"]:
+        notes.append(f"The sources may not contain: {', '.join(sig['missing'])}. If they do not, say the guideline does not cover it; do not use a value given for something else.")
+    if sig["best"] < 0:
+        notes.append("The evidence may be weak: answer only what the sources clearly state.")
+    return notes
+
+
+def notes_v3b_strict(sig):
+    """Weak-evidence notes that agree with SYSTEM_V3B_STRICT (any doubt -> the exact refusal)."""
+    notes = []
+    if sig["soft_out"]:
+        names = ", ".join(sig["soft_out"])
+        notes.append(f"The sources do not mention {names}. If the question is about {names}, reply exactly: {answer_mod.NOT_FOUND}")
+    if sig["missing"]:
+        notes.append(f"The sources may not contain: {', '.join(sig['missing'])}. If they do not, reply exactly: {answer_mod.NOT_FOUND}")
+    if sig["best"] < 0:
+        notes.append(f"The evidence may be weak: if the sources do not clearly state the answer, reply exactly: {answer_mod.NOT_FOUND}")
+    return notes
+
+
+def pages_of(hit):
+    return ", ".join(str(page) for page in hit["printed_pages"] if page is not None) or "?"
+
+
+def format_source_label(question, hits):
+    blocks = [f"Source [{n}]{' (table)' if hit['doc_type'] == 'table' else ''} - {hit['path']} - page {pages_of(hit)}:\n{hit['text']}"
+              for n, hit in enumerate(hits, 1)]
+    return "Sources:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {question}\nAnswer:"
+
+
+def format_markdown(question, hits):
+    blocks = [f"### [{n}] {hit['path']} (page {pages_of(hit)}){' - table' if hit['doc_type'] == 'table' else ''}\n{hit['text']}"
+              for n, hit in enumerate(hits, 1)]
+    return f"## Question\n{question}\n\n## Sources\n" + "\n\n".join(blocks) + f"\n\n## Task\nAnswer the question: {question}"
+
+
+VERSIONS = {"v1": (answer_mod.SYSTEM_PROMPT, Corrective.notes_for),
+            "v3b_med": (SYSTEM_V3B_MED, notes_v3b_med),
+            "v3b_strict": (SYSTEM_V3B_STRICT, notes_v3b_strict)}
+FORMATS = {"f0": answer_mod.build_prompt, "f1": format_source_label, "f2": format_markdown}
+
+
+def build(record, version, fmt):
+    """(system prompt, user prompt) for one question; notes are added only when the gate graded it P."""
+    system, notes_fn = VERSIONS[version]
+    notes = notes_fn(record["signals"]) if record["final"] == "P" else []
+    return system, ("Important: " + " ".join(notes) + "\n\n" if notes else "") + FORMATS[fmt](record["fixed"], record["hits"])
