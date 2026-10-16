@@ -1,12 +1,10 @@
-"""SwasthyaSetu chunker: sections + letters -> chunks (moved from notebook 06, logic unchanged).
-build_chunks(sections, letters, pages) returns the chunk records that notebook 06 saved as chunks.jsonl:
-section text packed by size with one-sentence overlap, tables by STC (Guttal et al. 2026), letters packed like sections,
-unreadable letters as one stub each."""
+"""SwasthyaSetu chunker: blocks -> chunks. Generic: it reads only block fields (design note 5.1), never meta,
+and knows nothing about any particular PDF. Logic moved from notebook 06: text packed by size with one-sentence
+overlap, tables by STC (Guttal et al. 2026), and one stub chunk (the block's summary) for a block that is not searchable.
+build_chunks(blocks, pages) -> chunk records."""
 import json
 import re
 from collections import Counter
-
-HEADING = {"L0", "L1", "L2", "L3"}
 
 # ---- size settings (characters; ~4-5 chars per token) ----
 TARGET     = 1000     # a split section aims for chunks about this size (~220 tokens)
@@ -16,7 +14,6 @@ MIN_CHUNK  = 300      # a sub-heading starts a new chunk only if the current one
 OVERLAP    = 1        # sentences repeated at the start of the next chunk of the same section
 SMALL      = 200      # a chunk under this is merged into its neighbour (same section/letter) when it fits
 TABLE_BUDGET = TARGET # B in characters (~250 tokens); embedder and reranker read only ~512 tokens
-LETTER_PARENT = "Annexure II: Compendium of Letters"
 
 # dots that do NOT end a sentence: abbreviations and single initials (C.K., D.O.)
 NO_END = re.compile(r"(\b(?:No|Nos|e\.g|i\.e|Rs|Dr|Mr|Ms|Mrs|Smt|Shri|Sh|etc|viz|vs|Govt|Dept|Fig|approx|Sl|para)\.|\b[A-Za-z]\.)$",
@@ -37,13 +34,13 @@ def write_jsonl(path, records):
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 
-def para_gap(sections):
-    """Paragraph gap learned from the data: the most common line step between body lines, times 1.3."""
-    gaps = Counter(round(b["top"] - a["top"]) for s in sections for a, b in zip(s["lines"], s["lines"][1:])
-                   if a["level"] == b["level"] == "body" and a["pdf_page"] == b["pdf_page"]
+def para_gap(blocks):
+    """Paragraph gap learned from the data: the most common line step between body text lines, times 1.3."""
+    gaps = Counter(round(b["top"] - a["top"]) for s in blocks for a, b in zip(s["items"], s["items"][1:])
+                   if a["type"] == b["type"] == "text" and a["pdf_page"] == b["pdf_page"]
                    and a.get("top") is not None and b.get("top") is not None and b["top"] > a["top"])
     if not gaps:
-        raise ValueError("sections.jsonl has no 'top' values -> re-run 05_sections: 20.3 (with \"top\") -> 20.T -> 20.H")
+        raise ValueError("no line positions ('top') in the blocks -> the extractor must keep each line's 'top'")
     return gaps.most_common(1)[0][0] * 1.3
 
 
@@ -97,10 +94,10 @@ def glue_continuations(blocks):
     return out
 
 
-# ---------------------------------------------------------------- section lines -> blocks (cell 7)
-def section_blocks(sec, gap):
-    """Lines -> blocks in order: heading / para / list / table.
-    A caption is glued to the block after it. Diagram lines (PDF 32) become one list block.
+# ---------------------------------------------------------------- block items -> text pieces (cell 7)
+def line_blocks(items, gap):
+    """Line items -> pieces in order: heading / para / list / table.
+    A caption is glued to the piece after it. Diagram lines (PDF 32) become one list piece.
     gap = paragraph gap from para_gap()."""
     blocks, buf, buf_pages, prev = [], [], set(), None
 
@@ -110,9 +107,9 @@ def section_blocks(sec, gap):
             blocks.append({"kind": "para", "text": join_lines(buf), "pages": set(buf_pages)})
         buf, buf_pages = [], set()
 
-    for l in sec["lines"]:
-        lv, t, n = l["level"], l["text"], l["pdf_page"]
-        if lv in HEADING or LABEL_BODY.match(t.strip()):               # bare "Annexure" / "I" = part of a title
+    for l in items:
+        lv, t, n = l["type"], l["text"], l["pdf_page"]
+        if lv == "heading" or LABEL_BODY.match(t.strip()):               # bare "Annexure" / "I" = part of a title
             flush(); blocks.append({"kind": "heading", "text": t.strip(), "pages": {n}})
         elif lv == "table":
             flush(); blocks.append({"kind": "table", "text": t.strip(), "pages": {n}})
@@ -147,6 +144,15 @@ def section_blocks(sec, gap):
         if b["kind"] == "caption":
             b["kind"] = "para"
     return glue_continuations(out)
+
+
+def item_blocks(block, gap):
+    """A block's items -> pieces: line items are joined into paragraphs; paragraph items are already paragraphs
+    (their pages are the block's pages)."""
+    if block["items"] and block["items"][0]["type"] == "paragraph":
+        return glue_continuations([{"kind": "para", "text": item["text"], "pages": set(block["pdf_pages"])}
+                                   for item in block["items"]])
+    return line_blocks(block["items"], gap)
 
 
 # ---------------------------------------------------------------- packing (cell 9)
@@ -270,10 +276,10 @@ def split_on_key_values(pairs, short):
     return pieces + [current]
 
 
-def table_groups(sec, captions):
+def table_groups(tables, captions):
     """Line 12 (context group): one table; its continuation on the next page with the same title + header joins it."""
     groups = []
-    for t in sec["tables"]:
+    for t in tables:
         title = captions.get(t["id"]) or t.get("title") or f"Table {t['id']}"
         last = groups[-1] if groups else None
         if last and (last["title"], last["header"]) == (title, t.get("header") or []) and t["pdf_page"] == last["pages"][-1] + 1:
@@ -324,51 +330,42 @@ def record(chunk_id, doc_type, path, sub_heading, pages, text, source, printed, 
             "footnotes": extra.get("footnotes", [])}
 
 
-def table_captions(sec, gap):
+def table_captions(block, gap):
     """Caption printed above a table ("Exhibit 2: ...") -> used as its title."""
     return {re.match(r"^\[table ([^\]]+)\]$", b["text"])[1]: b["caption"]
-            for b in section_blocks(sec, gap) if b["kind"] == "table" and b.get("caption")}
+            for b in line_blocks(block["items"], gap) if b["kind"] == "table" and b.get("caption")}
 
 
-def section_chunks(sec, gap, printed, method):
-    """method = {pdf_page: 'text' | 'ocr'} from pages.jsonl."""
-    out, src = [], "ocr" if any(method.get(n) == "ocr" for n in sec["pdf_pages"]) else "text"
-    for k, c in enumerate(pack(section_blocks(sec, gap)), 1):
-        notes = [f for f in sec["footnotes"] if f["pdf_page"] in c["pages"]]
-        out.append(record(f"{sec['section_id']}-{k:02d}", "glossary" if sec["kind"] == "glossary" else "section",
-                          sec["path"], c["sub_heading"], c["pages"], "\n\n".join(c["parts"]), src, printed,
-                          section_id=sec["section_id"], footnotes=notes))
-    for group in table_groups(sec, table_captions(sec, gap)):
+def block_chunks(block, gap, printed):
+    """One block -> its chunks: text chunks, then table chunks; a block that is not searchable -> one stub chunk.
+    chunk ids start with the block_id; chunk_fields are copied onto every chunk unread."""
+    fields = block["chunk_fields"]
+    if not block["searchable"]:
+        return [record(f"{block['block_id']}-01", f"{block['unit']}_stub", block["path"], None, block["pdf_pages"],
+                       block["summary"], block["source"], printed, **fields)]
+    out = []
+    for k, c in enumerate(pack(item_blocks(block, gap)), 1):
+        notes = [f for f in block["footnotes"] if f["pdf_page"] in c["pages"]]
+        out.append(record(f"{block['block_id']}-{k:02d}", block["unit"], block["path"], c["sub_heading"], c["pages"],
+                          "\n\n".join(c["parts"]), block["source"], printed, footnotes=notes, **fields))
+    tables = [item["table"] for item in block["items"] if item["type"] == "table"]
+    for group in table_groups(tables, table_captions(block, gap)):
         for k, (text, pages) in enumerate(stc_chunks(group), 1):
-            out.append(record(f"T{group['id']}-{k:02d}", "table", sec["path"], group["title"], pages,
-                              text, "text", printed, section_id=sec["section_id"]))
+            out.append(record(f"T{group['id']}-{k:02d}", "table", block["path"], group["title"], pages,
+                              text, "text", printed, **fields))
     return out
 
 
-def letter_chunks(letter, printed):
-    no, path = letter["letter_no"], [LETTER_PARENT, f"Letter {letter['letter_no']} ({letter['date_text']}): {letter['subject']}"]
-    if letter["status"] != "ok":
-        text = f"Letter {no} dated {letter['date_text']}: {letter['subject']}. {letter['notice']}"
-        return [record(f"L{no:02d}-01", "letter_stub", path, None, letter["pdf_pages"], text, "ocr", printed, letter_no=no)]
-    blocks = glue_continuations([{"kind": "para", "text": p.strip(), "pages": set(letter["pdf_pages"])}
-                                 for p in letter["body"].split("\n\n") if p.strip()])
-    return [record(f"L{no:02d}-{k:02d}", "letter", path, None, c["pages"], "\n\n".join(c["parts"]), "ocr", printed,
-                   letter_no=no)
-            for k, c in enumerate(pack(blocks), 1)]
-
-
-def build_chunks(sections, letters, pages):
-    """All chunks in notebook 06's order: every section's text + table chunks, then every letter."""
+def build_chunks(blocks, pages):
+    """All chunks, block by block in reading order."""
     printed = {p["pdf_page"]: p["printed_page"] for p in pages}
-    method = {p["pdf_page"]: p["method"] for p in pages}
-    gap = para_gap(sections)
-    return ([c for s in sections for c in section_chunks(s, gap, printed, method)]
-            + [c for letter in letters for c in letter_chunks(letter, printed)])
+    gap = para_gap(blocks)
+    return [c for block in blocks for c in block_chunks(block, gap, printed)]
 
 
 if __name__ == "__main__":
-    from src.paths import CHUNKS, LETTERS_JSONL, PAGES_FINAL, SECTIONS
-    chunks = build_chunks(read_jsonl(SECTIONS), read_jsonl(LETTERS_JSONL), read_jsonl(PAGES_FINAL))
+    from src.blocks import read_blocks
+    from src.paths import BLOCKS, CHUNKS, PAGES_FINAL
+    chunks = build_chunks(read_blocks(BLOCKS), read_jsonl(PAGES_FINAL))
     print(f"{len(chunks)} chunks:", dict(Counter(c["doc_type"] for c in chunks)),
           "| same as chunks.jsonl:", chunks == read_jsonl(CHUNKS))
-   

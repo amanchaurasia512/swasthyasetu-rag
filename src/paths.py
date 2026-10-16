@@ -22,7 +22,7 @@ TABLE_INV    = PROFILE / "table_inventory.csv"
 TOC_CSV       = PROFILE / "toc.csv"      #created at step 15
 PAGES_OCR    = INTERIM / "pages_ocr.jsonl"  
 PAGE_TYPES_CSV = PROFILE / "classify_pdf_pages.csv"   # notebook 01 writes (after the rename)
-
+ANSWER_QUESTIONS = EVAL_DIR / "answer_questions.csv"  # create at stage of answer evaluation for the  LLM  
 
 # ---------- pipeline files: who writes → who reads ----------
 PAGES_RAW    = INTERIM / "pages_raw.jsonl"      # step 12 writes → step 13 reads
@@ -34,7 +34,8 @@ LETTERS_JSONL = INTERIM / "letters.jsonl"       #created at step 15
 PAGES_FINAL    = INTERIM / "pages.jsonl"        # step 18 writes → step 20 reads
 SECTIONS     = INTERIM / "sections.jsonl"       #created at step 20
 CHUNKS       = INTERIM / "chunks.jsonl"          #create at chunking step
-ANSWER_QUESTIONS = EVAL_DIR / "answer_questions.csv"  # create at stage of answer evaluation for the  LLM  
+BLOCKS       = INTERIM / "blocks.jsonl"         # NHM extractor writes -> chunker reads (seam 1)#create at reconstruction
+
 
 #-------vecror databse-----------------
 VECTOR_DB  = ROOT / "data" / "vectordb"   
