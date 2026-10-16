@@ -14,3 +14,4 @@ rank-bm25==0.2.2
 snowballstemmer==3.1.1
 numpy==2.5.3
 pandas==2.3.3
+pytest 9.1.1
