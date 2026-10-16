@@ -71,11 +71,24 @@ def format_markdown(question, hits):
               for n, hit in enumerate(hits, 1)]
     return f"## Question\n{question}\n\n## Sources\n" + "\n\n".join(blocks) + f"\n\n## Task\nAnswer the question: {question}"
 
+def printed_and_pdf(hit):
+    """'printed page 17, 18; PDF page 37, 38' - printed '?' when the page has no printed number."""
+    return f"printed page {pages_of(hit)}; PDF page {', '.join(str(page) for page in hit['pdf_pages'])}"
+
+
+def format_page_labels(question, hits):
+    """f0p: f0 with both page numbers in each source header, so the model can tell printed pages from PDF pages
+    (C-014, the NHM09 fix). Needs hits with pdf_pages: new runs only, not E2's frozen evidence."""
+    blocks = [f"[{n}]{' (table)' if hit['doc_type'] == 'table' else ''} {hit['path']} ({printed_and_pdf(hit)})\n{hit['text']}"
+              for n, hit in enumerate(hits, 1)]
+    return (f"Question: {question}\n\nSources:\n\n" + "\n\n".join(blocks)
+            + f"\n\nAnswer this question using the sources above: {question}\nAnswer:")
+
 
 VERSIONS = {"v1": (answer_mod.SYSTEM_PROMPT, Corrective.notes_for),
             "v3b_med": (SYSTEM_V3B_MED, notes_v3b_med),
             "v3b_strict": (SYSTEM_V3B_STRICT, notes_v3b_strict)}
-FORMATS = {"f0": answer_mod.build_prompt, "f1": format_source_label, "f2": format_markdown}
+FORMATS = {"f0": answer_mod.build_prompt, "f1": format_source_label, "f2": format_markdown, "f0p": format_page_labels}
 
 
 def build(record, version, fmt):
@@ -83,3 +96,4 @@ def build(record, version, fmt):
     system, notes_fn = VERSIONS[version]
     notes = notes_fn(record["signals"]) if record["final"] == "P" else []
     return system, ("Important: " + " ".join(notes) + "\n\n" if notes else "") + FORMATS[fmt](record["fixed"], record["hits"])
+
