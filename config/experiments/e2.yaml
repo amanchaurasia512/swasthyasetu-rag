@@ -1,0 +1,24 @@
+# E2 replay: the prompt screening of notebook 15.11, written as an experiment.
+# Used to prove the runner plans E2 exactly (dry run); E2's own answers stay in prompt_ab_answers.csv.
+
+experiment: e2
+purpose: "E2 replay: 7 models on v1 and the 3 Tier-1 models on v3b_med and v3b_strict; 40 screening questions, f0, 2 runs"
+docs: [nhm_hrh_2022]
+question_set: screen          # screen = the questions.screen file (40); all = every question of the document
+plan:                         # notebook 15.11a PLAN, same order
+  - versions: [v1]
+    models:
+      - gemini:gemini-3.5-flash-lite
+      - groq:openai/gpt-oss-120b
+      - groq:openai/gpt-oss-20b
+      - groq:qwen/qwen3.8-27b
+      - nvidia:google/gemma-4-31b-it
+      - nvidia:nvidia/nemotron-3-super-120b-a12b
+      - nvidia:z-ai/glm-5.3-flash
+  - versions: [v3b_med, v3b_strict]
+    models:
+      - gemini:gemini-3.5-flash-lite
+      - groq:qwen/qwen3.8-27b
+      - nvidia:z-ai/glm-5.3-flash
+format: f0
+runs: 2

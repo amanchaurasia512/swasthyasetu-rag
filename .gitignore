@@ -34,3 +34,7 @@ GitHub_token github_pat_11AV2L2EI0L.txt
 
 #ollama.log
 notebooks/ollama.log
+
+
+#answers
+runs/
