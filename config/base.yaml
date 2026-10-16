@@ -1,0 +1,49 @@
+# Settings shared by every document. Phase 2: values equal today's code (checked by a test).
+
+normalize:
+  spell_min_len: 4            # query.MIN_LEN
+  spell_cutoff: 0.8           # query.CUTOFF
+  typo_min_len: 5             # corrective.TYPO_MIN_LEN
+
+retrieval:
+  embed_model: BAAI/bge-small-en-v1.5        # vectordb.EMBED_MODEL
+  rerank_model: Xenova/ms-marco-MiniLM-L-6-v2 # retriever.RERANK_MODEL
+  hybrid_pool: 50             # retriever.HYBRID_POOL
+  rrf_c: 60                   # retriever.RRF_C
+  rerank_pool: 20             # retriever.RERANK_POOL
+  keep_within: 5              # retriever.KEEP_WITHIN
+  top_k: 5                    # answer.TOP_K; also k=5 inside corrective.prepare / re_retrieve
+
+gate:
+  lower: -5.0                 # corrective.LOWER (= answer.MIN_RERANK_SCORE)
+  upper: 0.0                  # corrective.UPPER
+  re_retrieve_pool: 10        # corrective.POOL
+
+evidence:
+  context_top: 3              # answer.CONTEXT_TOP
+  context_tail: 700           # answer.CONTEXT_TAIL
+  refine: true                # Corrective(refine=True)
+  keep_strips: 2              # corrective.KEEP_STRIPS
+
+chunker:
+  target: 1000                # chunker.TARGET
+  keep_whole: 1400            # chunker.KEEP_WHOLE
+  hard_max: 1600              # chunker.HARD_MAX
+  min_chunk: 300              # chunker.MIN_CHUNK
+  overlap: 1                  # chunker.OVERLAP
+  small: 200                  # chunker.SMALL
+  table_budget: 1000          # chunker.TABLE_BUDGET (= TARGET)
+
+llm:
+  temperature: 0              # llm._api payload, llm.OPTIONS
+  api_max_tokens: 2048        # llm.API_MAX_TOKENS
+  gemini: {max_tokens: 4096, reasoning_effort: low}   # llm._api, gemini branch
+  gpt_oss: {reasoning_effort: low}                    # llm._api, "gpt-oss" branch
+  ollama: {num_ctx: 4096, num_predict: 512}           # llm.OPTIONS
+  timeout: 120                # notebook 15.11a TIMEOUT
+  tries: 2                    # notebook 15.11a TRIES
+  pause: {groq: 20, gemini: 5, nvidia: 3, openrouter: 4, ollama: 0}   # notebook 15.11a PAUSE
+
+scoring:
+  tau: 0.5                    # evaluate.TAU
+  refuse_first_counts: false  # evaluate.REFUSE_FIRST_COUNTS (Option 1, strict)

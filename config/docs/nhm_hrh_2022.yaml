@@ -1,0 +1,38 @@
+# One document. A new PDF = a new file like this + its extractor.
+
+doc_id: nhm_hrh_2022                       # extract/nhm.DOC_ID
+title: Guidelines on Human Resources for Health for NHM (2022)
+pdf: data/raw/Final Guideline on Human Resources for Health for NHM.pdf   # paths.PDF_PATH
+
+files:                                     # extractor output, frozen until step 4c
+  pages: data/interim/pages.jsonl          # paths.PAGES_FINAL
+  sections: data/interim/sections.jsonl    # paths.SECTIONS
+  letters: data/interim/letters.jsonl      # paths.LETTERS_JSONL
+  blocks: data/interim/blocks.jsonl        # paths.BLOCKS
+  chunks: data/interim/chunks.jsonl        # paths.CHUNKS
+
+index:
+  vectordb: data/vectordb                  # vectordb.VECTOR_DB_DIR
+  collection: hrh_chunks_bge_small         # vectordb.COLLECTION
+
+extractor:
+  letter_parent: "Annexure II: Compendium of Letters"   # extract/nhm.LETTER_PARENT
+
+not_found: "Not found in the guideline."   # answer.NOT_FOUND (= evaluate.NOT_FOUND)
+
+aliases:                                   # corrective.ALIASES (Indian short forms this PDF writes out)
+  MP: Madhya Pradesh
+  UP: Uttar Pradesh
+  HP: Himachal Pradesh
+  AP: Andhra Pradesh
+  TN: Tamil Nadu
+  WB: West Bengal
+  ICU: intensive care unit
+
+questions:                                 # notebook 15.1
+  manual: {file: data/eval/benchmark/manual_questions_with_answers.xlsx, label: answerable}
+  set_C:  {file: data/eval/benchmark/set_C_claude100.csv, label_from: expected}   # answer→answerable, refuse→unanswerable
+  negatives: {file: data/eval/negatives_50.csv, label: unanswerable, qid_prefix: N}
+  premise_qids: [C-061, C-063, C-064, C-065, C-066, C-067, C-068]   # notebook 15.2b: relabelled answerable
+  screen: data/eval/benchmark/screen_40.csv                          # notebook 15.10
+  frozen_evidence: data/eval/benchmark/prompt_ab_evidence.jsonl      # notebook 15.2 (173 questions)
