@@ -22,15 +22,18 @@ def forbidden(*args, **kwargs):
 def runner(argv, runs_dir):
     """run.main with every API entry point blocked."""
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(run, "chat", forbidden)
+        patch.setattr(run, "chat_full", forbidden)
         patch.setattr(run, "real_answer_check", forbidden)
         return run.main(argv, runs_dir=runs_dir)
-
 
 def read_lines(path):
     with open(path, encoding="utf-8") as file:
         return [json.loads(line) for line in file]
-
+    
+def reply(text, finish_reason="stop", answer_tokens=12):
+    """What llm.chat_full returns."""
+    return {"text": text, "prompt_tokens": 900, "answer_tokens": answer_tokens, "reasoning_tokens": None,
+            "finish_reason": finish_reason}
 
 @pytest.fixture(scope="module")
 def dry(tmp_path_factory):
@@ -90,7 +93,7 @@ def test_calls_save_every_answer_with_its_prompt(dry, tmp_path):
     """--allow-api-calls with a stand-in model: all 1,040 answers saved, each with the exact prompt it was sent."""
     folder = copy_of(dry, tmp_path)
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(run, "chat", lambda model, system, user, timeout, tries: "Not found in the guideline.")
+        patch.setattr(run, "chat_full", lambda model, system, user, timeout, tries: reply("Not found in the guideline."))
         patch.setattr(run, "real_answer_check", lambda model, timeout, tries: "42")
         patch.setattr(run.time, "sleep", lambda seconds: None)
         run.main(["--resume", folder.name, "--allow-api-calls"], runs_dir=tmp_path)
@@ -100,6 +103,32 @@ def test_calls_save_every_answer_with_its_prompt(dry, tmp_path):
     assert len(answers) == 1040 and manifest["status"] == "complete" and manifest["progress"]["pending"] == 0
     assert list(answers.prompt_hash) == rehashed
 
+def test_truncated_answers_are_saved_flagged_and_counted(dry, tmp_path):
+    """Option A: a cut-off answer is scored as usual, flagged in answers.csv and counted in scorecard and manifest."""
+    folder = copy_of(dry, tmp_path)
+    cut_off = {"NHM23", "NHM03"}
+
+    def stand_in(model, system, user, timeout, tries):
+        long_list = any(f"Question: {question}" in user for question in questions_of(folder, cut_off))
+        return reply("1. Stage one [1]\n2. Stage", "length", 2048) if long_list else reply("Not found in the guideline.")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(run, "chat_full", stand_in)
+        patch.setattr(run, "real_answer_check", lambda model, timeout, tries: "42")
+        patch.setattr(run.time, "sleep", lambda seconds: None)
+        run.main(["--resume", folder.name, "--allow-api-calls"], runs_dir=tmp_path)
+    answers = pd.read_csv(folder / "answers.csv")
+    scoring = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["scoring"]
+    cards = pd.read_csv(folder / "scorecard.csv", index_col=["model", "version"])
+    assert set(answers.columns) >= {"prompt_tokens", "answer_tokens", "reasoning_tokens", "finish_reason", "truncated"}
+    assert set(answers[answers.truncated].qid) == cut_off
+    assert scoring["truncated"] == cards["truncated"].sum() == 2 * 13 * 2          # 2 questions x 13 pairs x 2 runs
+    assert scoring["scored_answers"] == 1040                                       # still scored (option A)
+    assert scoring["answer_tokens"]["gemini:gemini-3.5-flash-lite"] == {"min": 12, "median": 12.0, "max": 2048}
+
+
+def questions_of(folder, qids):
+    return [record["fixed"] for record in read_lines(folder / "evidence.jsonl") if record["qid"] in qids]
 
 def test_resume_refuses_changed_input_file(dry, tmp_path):
     folder = copy_of(dry, tmp_path)

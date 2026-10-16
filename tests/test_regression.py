@@ -41,10 +41,11 @@ def e2_run(tmp_path_factory, e2_saved):
 
     def stand_in(model, system, user, timeout, tries):
         assert (model, system, user) in replies, f"{model}: the new path built a prompt E2 never sent"
-        return replies[(model, system, user)].pop(0)
+        return {"text": replies[(model, system, user)].pop(0), "prompt_tokens": None, "answer_tokens": None,
+                "reasoning_tokens": None, "finish_reason": "stop"}    
 
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(run, "chat", stand_in)
+        patch.setattr(run, "chat_full", stand_in)
         patch.setattr(run, "real_answer_check", lambda model, timeout, tries: "42")
         patch.setattr(run.time, "sleep", lambda seconds: None)
         folder = run.main(["--config", E2], runs_dir=runs_dir)

@@ -24,26 +24,23 @@ import pandas as pd
 
 from src import evaluate, pipeline, trace
 from src.config import config_hash, load, path_of
-from src.llm import LLMError, chat, provider_of, real_answer_check
+from src.llm import LLMError, chat_full, provider_of, real_answer_check
 from src.paths import ROOT
 
 RUNS = ROOT / "runs"
 PACKAGES = ("chromadb", "fastembed", "onnxruntime", "rank-bm25", "snowballstemmer", "numpy", "pandas", "pyyaml")
 ANSWER_KEY = ["model", "version", "format", "run", "qid"]
-
+TOKEN_FIELDS = ["prompt_tokens", "answer_tokens", "reasoning_tokens", "finish_reason"]
 
 # ------------------------------------------------------------------ small helpers
 def now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
-
 def git(*args) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout.strip()
 
-
 def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
-
 
 def package_version(name: str):
     try:
@@ -51,16 +48,13 @@ def package_version(name: str):
     except metadata.PackageNotFoundError:
         return None
 
-
 def log(folder: Path, text: str) -> None:
     print(text, flush=True)
     with open(folder / "run.log", "a", encoding="utf-8") as file:
         file.write(f"{now()}  {text}\n")
 
-
 def save_manifest(folder: Path, manifest: dict) -> None:
     (folder / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-
 
 # ------------------------------------------------------------------ what this run uses
 def input_files(config: dict) -> dict:
@@ -68,19 +62,15 @@ def input_files(config: dict) -> dict:
     return {**{name: sets[name]["file"] for name in ("manual", "set_C", "negatives")},
             "screen": sets["screen"], "chunks": config["files"]["chunks"]}
 
-
 def fingerprints(config: dict) -> dict:
     return {name: file_hash(path_of(relative)) for name, relative in input_files(config).items()}
-
 
 def pairs(config: dict) -> list[tuple[str, str]]:
     """(model, prompt version) in plan order: group by group, version by version, model by model."""
     return [(model, version) for group in config["plan"] for version in group["versions"] for model in group["models"]]
 
-
 def versions(config: dict) -> list[str]:
     return list(dict.fromkeys(version for model, version in pairs(config)))
-
 
 def select(questions: list[dict], config: dict) -> list[dict]:
     if config["question_set"] == "all":
@@ -88,10 +78,8 @@ def select(questions: list[dict], config: dict) -> list[dict]:
     by_qid = {question["qid"]: question for question in questions}
     return [by_qid[qid] for qid in pd.read_csv(path_of(config["questions"]["screen"])).qid]
 
-
 def to_llm(records: list[dict]) -> list[dict]:
     return [record for record in records if record.get("action") in pipeline.TO_LLM]
-
 
 # ------------------------------------------------------------------ new run: stages 1-6
 def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]]:
@@ -132,7 +120,6 @@ def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]
     save_manifest(folder, manifest)
     return folder, manifest, config, records
 
-
 # ------------------------------------------------------------------ resumed run: same folder, same evidence
 def reopen(folder: Path) -> tuple[Path, dict, dict, list[dict]]:
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
@@ -149,7 +136,6 @@ def reopen(folder: Path) -> tuple[Path, dict, dict, list[dict]]:
     log(folder, f"resumed {manifest['run_id']}")
     return folder, manifest, config, records
 
-
 # ------------------------------------------------------------------ stage 7: generate
 def saved_keys(folder: Path) -> set:
     answers = folder / "answers.csv"
@@ -157,13 +143,11 @@ def saved_keys(folder: Path) -> set:
         return set()
     return set(pd.read_csv(answers, usecols=ANSWER_KEY).itertuples(index=False, name=None))
 
-
 def pending(records: list[dict], config: dict, done: set) -> dict:
     """{(model, version): [(run, record), ...]} - only answer keys not saved yet, in E2's order."""
     jobs = {pair: [(run, record) for run in range(1, config["runs"] + 1) for record in to_llm(records)
                    if (*pair, config["format"], run, record["qid"]) not in done] for pair in pairs(config)}
     return {pair: pair_jobs for pair, pair_jobs in jobs.items() if pair_jobs}
-
 
 def answer_pair(folder: Path, run_id: str, config: dict, model: str, version: str, jobs: list) -> str:
     """Answers one model and prompt version; every answer is saved at once. An error stops this pair only."""
@@ -176,16 +160,18 @@ def answer_pair(folder: Path, run_id: str, config: dict, model: str, version: st
         built = pipeline.prompt(record, version, config["format"])
         started, began = now(), time.time()
         try:
-            text = chat(model, built["system"], built["prompt"], timeout=llm["timeout"], tries=llm["tries"])
+            reply = chat_full(model, built["system"], built["prompt"], timeout=llm["timeout"], tries=llm["tries"])
         except LLMError as error:
             return f"stopped after {number - 1}/{len(jobs)} - {str(error)[:200]}"
         row = {"run_id": run_id, "model": model, "version": version, "format": config["format"], "run": run,
-               "qid": record["qid"], "answer": text, "system": built["system"], "prompt": built["prompt"],
-               "prompt_hash": built["prompt_hash"], "seconds": round(time.time() - began, 1), "started_at": started}
+               "qid": record["qid"], "answer": reply["text"], "system": built["system"], "prompt": built["prompt"],
+               "prompt_hash": built["prompt_hash"], "seconds": round(time.time() - began, 1), "started_at": started,
+               **{key: reply[key] for key in TOKEN_FIELDS}, "truncated": reply["finish_reason"] == "length"}
         answers = folder / "answers.csv"
         pd.DataFrame([row]).to_csv(answers, mode="a", header=not answers.exists(), index=False)
         time.sleep(pause)
     return f"done - {len(jobs)} answers"
+
 # ------------------------------------------------------------------ stages 8-9: score, scorecard (no API calls)
 def scoring_rows(answers: pd.DataFrame, records: list[dict]) -> pd.DataFrame:
     """Each saved answer with its question data and sources from this run's evidence, and the prompt it was sent."""
@@ -198,13 +184,26 @@ def scoring_rows(answers: pd.DataFrame, records: list[dict]) -> pd.DataFrame:
     return answers.merge(question_data, on="qid", how="left")[evaluate.SCORING_COLUMNS]
 
 
+def token_use(answers: pd.DataFrame) -> dict:
+    """Truncated answers (option A: scored as usual, counted here) and answer tokens per model: min, median, max."""
+    if "truncated" not in answers:
+        return {}
+    tokens = pd.to_numeric(answers.answer_tokens, errors="coerce")
+    return {"truncated": int(answers.truncated.astype(str).eq("True").sum()),
+            "answer_tokens": {model: {"min": int(used.min()), "median": float(used.median()), "max": int(used.max())}
+                              for model, used in tokens.groupby(answers.model) if used.notna().any()}}
+
+
 def score(folder: Path, config: dict, records: list[dict]) -> dict:
     """Scores every saved answer; writes scored.csv, scorecard.csv and tradeoff.csv. Returns a short summary."""
     answers = pd.read_csv(folder / "answers.csv", keep_default_na=False)
     scored = evaluate.score_run(scoring_rows(answers, records))
     scored.to_csv(folder / "scored.csv", index=False)
-    evaluate.scorecards(scored).round(1).to_csv(folder / "scorecard.csv")
-    summary = {"scored_answers": len(scored)}
+    cards = evaluate.scorecards(scored).round(1)
+    if "truncated" in answers:
+        cards["truncated"] = answers.truncated.astype(str).eq("True").groupby([answers.model, answers.version]).sum()
+    cards.to_csv(folder / "scorecard.csv")
+    summary = {"scored_answers": len(scored), **token_use(answers)}
     if "tradeoff" in config:
         settings = config["tradeoff"]
         table, selected = evaluate.trade_off(scored, settings["models"], settings["versions"],
@@ -212,8 +211,9 @@ def score(folder: Path, config: dict, records: list[dict]) -> dict:
                                              settings["p_answerable"], settings["k_values"], settings["chosen_k"])
         table.to_csv(folder / "tradeoff.csv")
         summary["selected"] = list(selected)
-    log(folder, f"scored {len(scored)} answers -> scorecard.csv" + (f" | selected {summary['selected']}"
-                                                                    if "selected" in summary else ""))
+    log(folder, f"scored {len(scored)} answers -> scorecard.csv"
+                + (f" | truncated {summary['truncated']}" if "truncated" in summary else "")
+                + (f" | selected {summary['selected']}" if "selected" in summary else ""))
     return summary
 
 # ------------------------------------------------------------------ the command
