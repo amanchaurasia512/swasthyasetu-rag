@@ -77,8 +77,9 @@ def test_run_folder_files(dry):
 
 def test_resume_skips_saved_answers(dry, tmp_path):
     folder = copy_of(dry, tmp_path)
-    saved = [{"model": "gemini:gemini-3.5-flash-lite", "version": "v1", "format": "f0", "run": run_number, "qid": qid}
-             for run_number, qid in [(1, "NHM02"), (1, "NHM21"), (2, "NHM02")]]
+    saved = [{"model": "gemini:gemini-3.5-flash-lite", "version": "v1", "format": "f0", "run": run_number, "qid": qid,
+              "answer": "Not found in the guideline.", "prompt": ""}
+             for run_number, qid in [(1, "NHM02"), (1, "NHM21"), (2, "NHM02")]]    
     pd.DataFrame(saved).to_csv(folder / "answers.csv", index=False)
     runner(["--resume", folder.name], tmp_path)
     progress = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["progress"]

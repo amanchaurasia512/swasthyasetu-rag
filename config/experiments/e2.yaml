@@ -22,3 +22,12 @@ plan:                         # notebook 15.11a PLAN, same order
       - nvidia:z-ai/glm-5.3-flash
 format: f0
 runs: 2
+
+tradeoff:                     # notebook 15, trade-off cell (E2's decision)
+  models: [gemini:gemini-3.5-flash-lite, groq:qwen/qwen3.8-27b, nvidia:z-ai/glm-5.3-flash]
+  versions: [v1, v3b_med, v3b_strict]
+  retrieval_miss_qids: [NHM09]
+  accepted_corrections: []
+  p_answerable: 0.7
+  k_values: [1, 2, 3]
+  chosen_k: 3

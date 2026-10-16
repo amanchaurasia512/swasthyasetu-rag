@@ -5,8 +5,8 @@
     python -m src.run --resume e3-20261020-1430 --allow-api-calls         answer only the missing keys
 
 Writes runs/<run_id>/: manifest.json (the run's ID card), evidence.jsonl (stages 1-5, every hit field),
-traces.jsonl (one line per question), answers.csv (one row per answer, saved at once, with its exact prompt), run.log.
-A resumed run reuses its own evidence and refuses to go on if the settings or an input file changed.
+traces.jsonl (one line per question), answers.csv (one row per answer, saved at once, with its exact prompt), run.log,
+and once answers exist: scored.csv, scorecard.csv and (if the experiment sets a trade-off) tradeoff.csv.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src import pipeline, trace
+from src import evaluate, pipeline, trace
 from src.config import config_hash, load, path_of
 from src.llm import LLMError, chat, provider_of, real_answer_check
 from src.paths import ROOT
@@ -186,9 +186,38 @@ def answer_pair(folder: Path, run_id: str, config: dict, model: str, version: st
         pd.DataFrame([row]).to_csv(answers, mode="a", header=not answers.exists(), index=False)
         time.sleep(pause)
     return f"done - {len(jobs)} answers"
+# ------------------------------------------------------------------ stages 8-9: score, scorecard (no API calls)
+def scoring_rows(answers: pd.DataFrame, records: list[dict]) -> pd.DataFrame:
+    """Each saved answer with its question data and sources from this run's evidence, and the prompt it was sent."""
+    by_qid = {record["qid"]: record for record in records}
+    question_data = pd.DataFrame([{"qid": qid, "source": record["source"], "label": record["label"],
+                                   "question": record["question"], "action": record["action"],
+                                   "expected": record["expected"] or "",
+                                   "sources": [hit["text"] for hit in record["hits"]]}
+                                  for qid, record in by_qid.items()])
+    return answers.merge(question_data, on="qid", how="left")[evaluate.SCORING_COLUMNS]
 
+
+def score(folder: Path, config: dict, records: list[dict]) -> dict:
+    """Scores every saved answer; writes scored.csv, scorecard.csv and tradeoff.csv. Returns a short summary."""
+    answers = pd.read_csv(folder / "answers.csv", keep_default_na=False)
+    scored = evaluate.score_run(scoring_rows(answers, records))
+    scored.to_csv(folder / "scored.csv", index=False)
+    evaluate.scorecards(scored).round(1).to_csv(folder / "scorecard.csv")
+    summary = {"scored_answers": len(scored)}
+    if "tradeoff" in config:
+        settings = config["tradeoff"]
+        table, selected = evaluate.trade_off(scored, settings["models"], settings["versions"],
+                                             set(settings["retrieval_miss_qids"]), set(settings["accepted_corrections"]),
+                                             settings["p_answerable"], settings["k_values"], settings["chosen_k"])
+        table.to_csv(folder / "tradeoff.csv")
+        summary["selected"] = list(selected)
+    log(folder, f"scored {len(scored)} answers -> scorecard.csv" + (f" | selected {summary['selected']}"
+                                                                    if "selected" in summary else ""))
+    return summary
 
 # ------------------------------------------------------------------ the command
+
 def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
     parser = argparse.ArgumentParser(description="SwasthyaSetu runner (dry run unless --allow-api-calls)")
     source = parser.add_mutually_exclusive_group(required=True)
@@ -219,12 +248,10 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
     still = sum(len(pair_jobs) for pair_jobs in pending(records, config, saved_keys(folder)).values())
     manifest["progress"] |= {"answers_saved": len(saved_keys(folder)), "pending": still}
     manifest["progress"]["history"].append(entry)
+    if (folder / "answers.csv").exists():
+        manifest["scoring"] = score(folder, config, records)
     if args.allow_api_calls:
         manifest["status"] = "complete" if still == 0 else "stopped"
         manifest["finished_at"] = now()
     save_manifest(folder, manifest)
     return folder
-
-
-if __name__ == "__main__":
-    main()
