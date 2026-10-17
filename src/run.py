@@ -258,3 +258,6 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
         manifest["finished_at"] = now()
     save_manifest(folder, manifest)
     return folder
+
+if __name__ == "__main__":
+    main()
