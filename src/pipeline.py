@@ -47,8 +47,9 @@ def question(source, qid, label, text, expected) -> dict:
 
 
 def load_questions(config: dict) -> list[dict]:
-    """All questions in notebook 15.1's order (manual, set C, negatives); false premises the guideline can
-    correct are answerable, with the correction as the expected answer (notebook 15.2b)."""
+    """All questions in notebook 15.1's order (manual, set C, negatives), then an experiment's new set if it has one;
+    false premises the guideline can correct are answerable, with the correction as the expected answer (15.2b);
+    questions the experiment lists under 'removed' are left out."""
     sets = config["questions"]
     manual, set_c, negatives = (read_table(path_of(sets[name]["file"])) for name in ("manual", "set_C", "negatives"))
     corrections = {row.qid: PREMISE_PREFIX.sub("", row.reference_answer)
@@ -59,9 +60,13 @@ def load_questions(config: dict) -> list[dict]:
                     row.reference_answer if row.expected == "answer" else "") for row in set_c.itertuples()]
         + [question("negatives", f"{sets['negatives']['qid_prefix']}{index:02d}", sets["negatives"]["label"], text, "")
            for index, text in enumerate(negatives.question)])
+    if "new" in sets:
+        questions += [question("new", row.qid, row.label, row.question,
+                               row.expected_answer if row.label == "answerable" else "")
+                      for row in read_table(path_of(sets["new"]["file"])).itertuples()]
+    removed = set(sets.get("removed", []))
     return [{**item, "label": "answerable", "expected": corrections[item["qid"]]} if item["qid"] in corrections else item
-            for item in questions]
-
+            for item in questions if item["qid"] not in removed]
 
 # ------------------------------------------------------------------ stages 2-5: prepare
 def open_gate(config: dict) -> Corrective:

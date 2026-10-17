@@ -1,0 +1,17 @@
+# E3: the final benchmark - E2's choice (Gemini flash-lite + v3b_med) with format f0p, on the full question set.
+
+experiment: e3
+purpose: "E3: Gemini flash-lite + v3b_med + f0p; all questions (10 swapped for 12 new), 2 runs"
+docs: [nhm_hrh_2022]
+question_set: all             # every question; the gate decides which reach the LLM
+questions:
+  new: {file: data/eval/benchmark/new_questions_12.xlsx}   # written by the author 17 Oct 2026: 4 general, 3 spelling,
+                                                           # 1 table, 1 letter, 1 OCR, 2 irrelevant (Claude)
+  removed: [C-019, C-003, NHM01, C-029, C-051, C-036, C-037, NHM06, NHM10, C-018]
+  # rule: answerable, reached the LLM in E2's frozen evidence, a gold chunk already in its hits (71 questions);
+  # 10 drawn from the sorted list with random_state=7 (tests/test_e3_questions.py recomputes it)
+plan:
+  - versions: [v3b_med]
+    models: [gemini:gemini-3.5-flash-lite]
+format: f0p
+runs: 2

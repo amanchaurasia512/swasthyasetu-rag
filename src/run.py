@@ -26,6 +26,7 @@ from src import evaluate, pipeline, trace
 from src.config import config_hash, load, path_of
 from src.llm import LLMError, chat_full, provider_of, real_answer_check
 from src.paths import ROOT
+from dotenv import load_dotenv
 
 RUNS = ROOT / "runs"
 PACKAGES = ("chromadb", "fastembed", "onnxruntime", "rank-bm25", "snowballstemmer", "numpy", "pandas", "pyyaml")
@@ -60,6 +61,7 @@ def save_manifest(folder: Path, manifest: dict) -> None:
 def input_files(config: dict) -> dict:
     sets = config["questions"]
     return {**{name: sets[name]["file"] for name in ("manual", "set_C", "negatives")},
+            **({"new": sets["new"]["file"]} if "new" in sets else {}),
             "screen": sets["screen"], "chunks": config["files"]["chunks"]}
 
 def fingerprints(config: dict) -> dict:
@@ -235,6 +237,7 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
     entry = {"at": now(), "pending_before": total, "api_calls": args.allow_api_calls, "results": {}}
 
     if args.allow_api_calls:
+        load_dotenv(ROOT / ".env", override=True)
         manifest["status"] = "running"
         save_manifest(folder, manifest)
         for (model, version), pair_jobs in jobs.items():
