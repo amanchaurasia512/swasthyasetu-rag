@@ -5,7 +5,7 @@ Run from the project root:   python -m pytest tests/test_rewrite.py -q"""
 import json
 
 import yaml
-
+from spellchecker import SpellChecker
 from src import pipeline, rewrite, run
 from src.config import load
 from src.llm import LLMError
@@ -86,3 +86,12 @@ def test_live_start_rewrites_every_question_and_counts_failures(tmp_path, monkey
     assert sum(record["rewrite"]["error"] == "quota" for record in records) == 1
     assert "rewrite failed, SpellFixer used" in (folder / "run.log").read_text(encoding="utf-8")
     assert all(line["normalize"]["rewrite"] for line in map(json.loads, (folder / "traces.jsonl").open(encoding="utf-8")))
+
+def test_unknown_words_decide_the_rewrite():
+    """C-032: Hindi words and typos count; what the rewrite must keep as written (abbreviations, names inside a
+    sentence) and contractions do not; the first word of a sentence still counts."""
+    english, vocab = SpellChecker(), {"nhm", "anm", "probation"}
+    assert rewrite.unknown_words("probation period kitna hota hai", vocab, english) == ["kitna", "hota", "hai"]
+    assert rewrite.unknown_words("is ther a parking alowance", vocab, english) == ["ther", "alowance"]
+    assert rewrite.unknown_words("Probaton kitne din ka hota hai?", vocab, english) == ["Probaton", "kitne", "hota", "hai"]
+    assert rewrite.unknown_words("Can an ANM from Infosys work in the ICU? I've asked NHM.", vocab, english) == []

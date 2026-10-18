@@ -5,6 +5,7 @@ the run shows the real waiting time and the real failures. Only the runner calls
 from __future__ import annotations
 
 import time
+import re
 
 from src import prompts
 from src.llm import LLMError, chat_full
@@ -24,3 +25,19 @@ def ask(question: str, config: dict) -> dict:
         text, error = "", str(failure)[:200]
     return {"model": query["rewrite_model"], "version": query["rewrite_version"], "text": text,
             "seconds": round(time.time() - began, 2), "error": error}
+
+def unknown_words(question: str, vocab, english) -> list[str]:
+    """Words of the question that are neither English (english: a SpellChecker) nor in the PDF's own vocabulary
+    (vocab: lower-case words of the chunks). Any such word sends the question to the rewrite (C-032). Words the
+    rewrite must keep as written (prompts.REWRITES) never count: ALL-CAPS abbreviations and capitalised words inside
+    a sentence ("ICU", "Infosys"); the first word of a sentence still counts ("Probaton kitne ..."). Single letters,
+    numbers and contractions ("I've") are left out."""
+    found = []
+    for match in re.finditer(r"[A-Za-z]+(?:'[A-Za-z]+)?", question):
+        word, before = match.group(), question[:match.start()].rstrip()
+        starts_sentence = not before or before[-1] in ".?!"
+        kept_as_written = word.isupper() or (word[0].isupper() and not starts_sentence)
+        if len(word) > 1 and "'" not in word and not kept_as_written \
+                and word.lower() not in vocab and not english.known([word.lower()]):
+            found.append(word)
+    return found
