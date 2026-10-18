@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from src import evaluate, pipeline, trace
 from src.config import config_hash, load, path_of
 from src.llm import LLMError, chat_full, provider_of, real_answer_check
 from src.paths import ROOT

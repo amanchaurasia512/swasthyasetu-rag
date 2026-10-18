@@ -146,3 +146,10 @@ def test_resume_refuses_changed_settings(dry, tmp_path):
     (folder / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(SystemExit, match="settings"):
         runner(["--resume", folder.name], tmp_path)
+
+def test_runner_keeps_its_command_line_entry_point():
+    """python -m src.run needs these two lines at the end of src/run.py; they were lost twice when main was
+    replaced by copy-paste (C-013, C-029), and every other test still passed because they call main() directly."""
+    with open(run.__file__, encoding="utf-8") as file:
+        source = file.read()
+    assert source.rstrip().endswith('if __name__ == "__main__":\n    main()')
