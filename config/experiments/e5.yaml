@@ -1,0 +1,22 @@
+# E5: the chatbot's settings (config/app.yaml) on E3's question set - same questions, model, prompt, format and runs
+# as E3, so every difference comes from the decisions since E3 (C-018..C-034). tests/test_e5.py checks that this
+# file and config/app.yaml agree.
+
+experiment: e5
+purpose: "E5: chatbot settings (English check + gate decisions) on the E3 question set; Gemini flash-lite + v3b_med + f0p; 2 runs"
+docs: [nhm_hrh_2022]
+question_set: all
+questions:
+  new: {file: data/eval/benchmark/new_questions_12.xlsx}
+  removed: [C-019, C-003, NHM01, C-029, C-051, C-036, C-037, NHM06, NHM10, C-018]   # same as E3
+query:
+  front_end: rewrite_if_unknown   # C-032
+gate:
+  m_action: answer                # C-027/C-028
+  p_notes: false                  # C-025
+  re_retrieve: false              # C-025
+plan:
+  - versions: [v3b_med]
+    models: [gemini:gemini-3.5-flash-lite]
+format: f0p
+runs: 2
