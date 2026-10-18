@@ -1,0 +1,6 @@
+# Streamlit settings for the SwasthyaSetu chat page (C-034). Read from the project root: streamlit run app/streamlit_app.py
+[theme]
+base = "dark"
+
+[browser]
+gatherUsageStats = false
