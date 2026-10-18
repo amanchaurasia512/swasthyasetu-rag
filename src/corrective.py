@@ -60,13 +60,7 @@ def norm(text: str) -> str:
 
 
 class Corrective:
-    # def __init__(self, retriever, speller, refine: bool = True):
-    #     self.R = retriever
-    #     self.SP = speller
-    #     self.refine_on = refine
-    #     self.corpus_stems = {s for c in retriever.chunks for s in self.stems(c["embed_text"])}
-    #     self.pdf_numbers = {n for c in retriever.chunks for n in re.findall(r"\d+(?:-\d+)?", norm(c["text"]))}
-
+    
     def __init__(self, retriever, speller, refine: bool = True):
         self.R = retriever
         self.SP = speller
@@ -188,32 +182,7 @@ class Corrective:
         return notes
 
     # ------------------------------------------------------------------ the whole layer for one question
-    # def prepare(self, question: str) -> dict:
-    #     """Everything before the LLM call. 'prompt' is empty when the answer is fixed (reject / scoped)."""
-    #     fixed, changes = self.SP.fix(question)
-    #     fixed = expand_aliases(fixed)                 # MP -> Madhya Pradesh (shows in the 'fixed' column)
-    #     hits = self.R.search(fixed, k=5)
-    #     sig = self.signals(fixed, hits)
-    #     first = final = self.grade(sig)
-    #     if first == "P":
-    #         hits = self.re_retrieve(fixed, sig)
-    #         sig = self.signals(fixed, hits)
-    #         final = self.grade(sig)
-    #     base = {"fixed": fixed, "changes": changes, "first": first, "final": final, "best": sig["best"],
-    #             "signals": sig, "hits": hits, "hit_ids": ";".join(h["chunk_id"] for h in hits)}
-    #     if final == "I":
-    #         return {**base, "action": "reject", "fixed_answer": answer_mod.NOT_FOUND, "prompt": "", "notes": ""}
-    #     if final == "M":
-    #         terms = ", ".join(sig["hard_out"])
-    #         scoped = f"The guideline does not cover {terms}. It covers human resources under the National Health Mission (NHM) only."
-    #         return {**base, "action": "scoped", "fixed_answer": scoped, "prompt": "", "notes": ""}
-    #     notes = self.notes_for(sig) if final == "P" else []
-    #     hits = answer_mod.add_context(hits, self.R)
-    #     hits = self.refine(hits, fixed) if self.refine_on else hits
-    #     prompt = ("Important: " + " ".join(notes) + "\n\n" if notes else "") + answer_mod.build_prompt(fixed, hits)
-    #     return {**base, "hits": hits, "action": "answer_with_note" if notes else "answer", "fixed_answer": "",
-    #             "prompt": prompt, "notes": " | ".join(notes)}
-    
+ 
     def prepare(self, question: str) -> dict:
         """Everything before the LLM call. 'prompt' is empty when the answer is fixed (reject / scoped)."""
         fixed, changes = self.SP.fix(question)

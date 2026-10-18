@@ -96,13 +96,7 @@ class Retriever:
         return [self._stem(w) for w in words if w not in STOP]
 
     # ------------------------------------------------------------------ models, loaded only when needed
-    # @property  #older emmber 
-    # def embedder(self):
-    #     if self._embedder is None:
-    #         from fastembed import TextEmbedding
-    #         self._embedder = TextEmbedding(EMBED_MODEL, cache_dir=str(self.models_dir))
-    #     return self._embedder
-
+ 
     @property
     def embedder(self):
         if self._embedder is None:
@@ -124,26 +118,6 @@ class Retriever:
                 "printed_pages": ",".join(str(p) for p in c["printed_pages"] if p is not None),
                 "path": " > ".join(c["path"])}
 
-    # def _open_collection(self, rebuild: bool = False):
-    #     """Open the ChromaDB collection; (re)build it if it is missing or does not match chunks.jsonl."""
-    #     import chromadb
-    #     client = chromadb.PersistentClient(path=str(self.db_dir))
-    #     col = client.get_or_create_collection(name=self.collection_name, embedding_function=None,
-    #                                           metadata={"hnsw:space": "cosine"})
-    #     ids = [c["chunk_id"] for c in self.chunks]
-    #     if rebuild or set(col.get(include=[])["ids"]) != set(ids):
-    #         client.delete_collection(self.collection_name)
-    #         col = client.create_collection(name=self.collection_name, embedding_function=None,
-    #                                        metadata={"hnsw:space": "cosine"})
-    #         vectors = np.array(list(self.embedder.passage_embed([c["embed_text"] for c in self.chunks])))
-    #         col.add(ids=ids, embeddings=vectors.tolist(),
-    #                 documents=[c["text"] for c in self.chunks],
-    #                 metadatas=[self._metadata(c) for c in self.chunks])
-    #     return col
-
-    # def rebuild_vector_db(self):
-    #     """Call after chunks.jsonl changes (new chunking or new embedding model)."""
-    #     self.collection = self._open_collection(rebuild=True)
 
     # ------------------------------------------------------------------ vector database (src/vectordb.py)
     def _open_collection(self, rebuild: bool = False):
@@ -173,12 +147,7 @@ class Retriever:
         top = sorted(fused, key=fused.get, reverse=True)[:k]
         return [(i, fused[i]) for i in top]
 
-    # def _rerank(self, question: str, k: int):
-    #     cands  = [i for i, _ in self._hybrid(question, RERANK_POOL)]
-    #     scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))
-    #     order  = np.argsort(-scores, kind="stable")[:k]
-    #     return [(cands[j], float(scores[j])) for j in order]
-    
+
     def _rerank(self, question: str, k: int):
         cands  = [i for i, _ in self._hybrid(question, RERANK_POOL)]
         scores = np.array(list(self.reranker.rerank(question, [self.chunks[i]["embed_text"] for i in cands])))

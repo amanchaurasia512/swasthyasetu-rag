@@ -91,10 +91,7 @@ def add_context(hits: list[dict], retriever: Retriever,
 
 
 class Answerer:
-    # def __init__(self, model: str = OLLAMA_MODEL, retriever: Retriever | None = None):
-    #     self.model = model
-    #     self.retriever = retriever or Retriever()
-
+    
     def __init__(self, model: str = OLLAMA_MODEL, retriever: Retriever | None = None,
                  system_prompt: str = SYSTEM_PROMPT):
         self.model = model
@@ -102,18 +99,7 @@ class Answerer:
         self.system_prompt = system_prompt
         self.speller = SpellFixer(self.retriever.chunks)
 
-    # def generate(self, prompt: str) -> str:
-    #     """Send one prompt to Ollama and return its reply text."""
-    #     r = requests.post(OLLAMA_URL, timeout=300, json={
-    #         "model": self.model,
-    #         # "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-    #         "messages": [{"role": "system", "content": self.system_prompt},
-    #                      {"role": "user", "content": prompt}],
-    #         "stream": False,
-    #         "options": {"temperature": 0, "num_ctx": 8192},   # 0 = same answer every time; 8192 tokens fits 5 chunks
-    #     })
-    #     r.raise_for_status()
-    #     return r.json()["message"]["content"].strip()
+
     def generate(self, prompt: str) -> str:
         """Send one prompt to Ollama and return its reply text."""
         payload = {
@@ -128,42 +114,7 @@ class Answerer:
         r = requests.post(OLLAMA_URL, timeout=600, json=payload)
         r.raise_for_status()
         text = r.json()["message"]["content"]
-        return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()    
-
-    # def ask(self, question: str, k: int = TOP_K) -> dict:
-    #     t0 = time.time()
-    #     hits = self.retriever.search(question, k=k)
-    #     t1 = time.time()
-    #     answer = self.generate(build_prompt(question, hits))
-    #     t2 = time.time()
-    #     sources = [{"n": n, "chunk_id": h["chunk_id"], "path": h["path"],
-    #                 "printed_pages": h["printed_pages"], "pdf_pages": h["pdf_pages"]}
-    #                for n, h in enumerate(hits, 1)]
-    #     return {"question": question, "answer": answer, "sources": sources,
-    #             "not_found": answer.startswith(NOT_FOUND.rstrip(".")),
-    #             "seconds_search": round(t1 - t0, 1), "seconds_answer": round(t2 - t1, 1)}
-
-    # def ask(self, question: str, k: int = TOP_K) -> dict:
-    #     t0 = time.time()
-    #     fixed, spelling = self.speller.fix(question)              # 1. query processing (spelling only)
-    #     hits = self.retriever.search(fixed, k=k)                  # 2. BM25 + vector -> RRF -> rerank
-    #     best = max(h["score"] for h in hits)
-    #     t1 = time.time()
-    #     if best < MIN_RERANK_SCORE:                               # 3. corpus gate: nothing relevant
-    #         answer, hits, by = NOT_FOUND, [], "gate"
-    #     else:                                                     # 4. LLM: sufficiency + answer + citations
-    #         answer = self.generate(build_prompt(fixed, hits))
-    #         by = "llm" if answer.startswith(NOT_FOUND.rstrip(".")) else None
-
-    #     t2 = time.time()
-    #     sources = [{"n": n, "chunk_id": h["chunk_id"], "path": h["path"],
-    #                 "printed_pages": h["printed_pages"], "pdf_pages": h["pdf_pages"]}
-    #                for n, h in enumerate(hits, 1)]
-    #     return {"question": question, "fixed_question": fixed, "spelling": spelling,
-    #             "answer": answer, "sources": sources,
-    #             "not_found": by is not None, "not_found_by": by, "best_score": round(best, 2),
-    #             "seconds_search": round(t1 - t0, 1), "seconds_answer": round(t2 - t1, 1)}
-     
+        return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()     
 
     def ask(self, question: str, k: int = TOP_K) -> dict:
         t0 = time.time()
