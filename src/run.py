@@ -3,8 +3,8 @@
     python -m src.run --config config/experiments/e3.yaml                 new run: stages 1-6, plan, no calls
     python -m src.run --resume e3-20261020-1430                           what is still missing, no calls
     python -m src.run --resume e3-20261020-1430 --allow-api-calls         answer only the missing keys
-    An experiment with query.front_end: rewrite (C-029) asks the rewrite live while it prepares, so its new run needs
-    --allow-api-calls from the start; without the switch it only prints the plan and writes nothing.
+    An experiment with query.front_end: rewrite (C-029) or rewrite_if_unknown (C-032) asks the rewrite live while it
+    prepares, so its new run needs --allow-api-calls from the start; without the switch it only prints the plan.
 
 Writes runs/<run_id>/: manifest.json (the run's ID card), evidence.jsonl (stages 1-5, every hit field),
 traces.jsonl (one line per question), answers.csv (one row per answer, saved at once, with its exact prompt), run.log,
@@ -27,6 +27,7 @@ import pandas as pd
 from src.config import config_hash, load, path_of
 from src.llm import LLMError, chat_full, provider_of, real_answer_check
 from src.paths import ROOT
+from src.query import SpellFixer
 from dotenv import load_dotenv
 from src import evaluate, pipeline, rewrite, trace
 
@@ -90,11 +91,15 @@ def rewrite_plan(experiment: str) -> int:
     """Live rewrite front end without --allow-api-calls: the run cannot be prepared (what is searched depends on the
     rewrite), so nothing is written; the number of rewrite calls the real run will make is printed instead."""
     config = load(experiment)
-    questions = len(select(pipeline.load_questions(config), config))
-    print(f"front end 'rewrite': {questions} rewrite calls ({config['query']['rewrite_model']}), then up to "
-          f"{questions * len(pairs(config)) * config['runs']} answer calls (the gate decides after the rewrite).\n"
+    front_end, questions = config["query"]["front_end"], select(pipeline.load_questions(config), config)
+    with open(path_of(config["files"]["chunks"]), encoding="utf-8") as file:
+        speller = SpellFixer([json.loads(line) for line in file])
+    calls = sum(rewrite.needed(question["question"], front_end, speller) for question in questions)
+    print(f"front end '{front_end}': {calls} of {len(questions)} questions get a rewrite call "
+          f"({config['query']['rewrite_model']}), then up to {len(questions) * len(pairs(config)) * config['runs']} "
+          f"answer calls (the gate decides after the rewrite).\n"
           f"No API calls made, nothing written. Start the run with --allow-api-calls.")
-    return questions
+    return calls
 
 
 def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]]:
@@ -118,11 +123,11 @@ def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]
     log(folder, f"run {run_id} | {config['purpose']}")
 
     gate, notes = pipeline.open_gate(config), config["gate"]["p_notes"]
-    rewriting = config["query"]["front_end"] == "rewrite"
     pause = config["llm"]["pause"][provider_of(config["query"]["rewrite_model"])[0]]
     records = []
     for question in select(pipeline.load_questions(config), config):
-        asked = rewrite.ask(question["question"], config) if rewriting else None
+        asked = rewrite.ask(question["question"], config) \
+            if rewrite.needed(question["question"], config["query"]["front_end"], gate.SP) else None
         if asked and asked["error"]:
             log(folder, f"{question['qid']} rewrite failed, SpellFixer used: {asked['error'][:100]}")
         began = time.time()
@@ -251,7 +256,7 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path | None:
     parser.add_argument("--allow-api-calls", action="store_true", help="really call the models")
     args = parser.parse_args(argv)
 
-    if args.config and load(args.config)["query"]["front_end"] == "rewrite" and not args.allow_api_calls:
+    if args.config and load(args.config)["query"]["front_end"] != "spellfixer" and not args.allow_api_calls:
         rewrite_plan(args.config)
         return None
     if args.allow_api_calls:
@@ -285,6 +290,7 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path | None:
         manifest["finished_at"] = now()
     save_manifest(folder, manifest)
     return folder
+
 
 if __name__ == "__main__":
     main()

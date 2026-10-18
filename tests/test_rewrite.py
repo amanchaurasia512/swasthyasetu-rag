@@ -3,7 +3,8 @@ SpellFixer, the gate searches the rewrite when there is one, and a dry run with 
 No API calls - the LLM is replaced by a stand-in.
 Run from the project root:   python -m pytest tests/test_rewrite.py -q"""
 import json
-
+from types import SimpleNamespace
+import pytest
 import yaml
 from spellchecker import SpellChecker
 from src import pipeline, rewrite, run
@@ -49,12 +50,12 @@ def test_failed_rewrite_falls_back_to_the_spellfixer(gate):
     assert record["fixed"] == pipeline.prepare(question, gate)["fixed"]
     assert record["rewrite"]["error"] == "quota"
 
-
-def test_dry_run_with_rewrite_front_end_calls_nothing_and_writes_nothing(tmp_path, monkeypatch):
+@pytest.mark.parametrize("front_end", ["rewrite", "rewrite_if_unknown"])
+def test_dry_run_with_a_rewrite_front_end_calls_nothing_and_writes_nothing(tmp_path, monkeypatch, front_end):
     experiment = tmp_path / "live.yaml"
     experiment.write_text(yaml.safe_dump({
         "experiment": "live", "purpose": "test", "docs": ["nhm_hrh_2022"], "question_set": "all",
-        "query": {"front_end": "rewrite"}, "plan": [{"versions": ["v3b_med"], "models": ["gemini:test"]}],
+        "query": {"front_end": front_end}, "plan": [{"versions": ["v3b_med"], "models": ["gemini:test"]}],
         "format": "f0p", "runs": 2}), encoding="utf-8")
     monkeypatch.setattr(rewrite, "chat_full", forbidden)
     monkeypatch.setattr(run, "chat_full", forbidden)
@@ -95,3 +96,28 @@ def test_unknown_words_decide_the_rewrite():
     assert rewrite.unknown_words("is ther a parking alowance", vocab, english) == ["ther", "alowance"]
     assert rewrite.unknown_words("Probaton kitne din ka hota hai?", vocab, english) == ["Probaton", "kitne", "hota", "hai"]
     assert rewrite.unknown_words("Can an ANM from Infosys work in the ICU? I've asked NHM.", vocab, english) == []
+
+def test_needed_follows_the_front_end():
+    """C-032: spellfixer never asks, rewrite always asks, rewrite_if_unknown asks only for unknown words."""
+    speller = SimpleNamespace(vocab={"probation", "period"}, english=SpellChecker())
+    clean, hinglish = "How long is the probation period?", "probation period kitna hota hai"
+    assert [rewrite.needed(clean, front_end, speller) for front_end in ("spellfixer", "rewrite", "rewrite_if_unknown")] \
+        == [False, True, False]
+    assert rewrite.needed(hinglish, "rewrite_if_unknown", speller) and not rewrite.needed(hinglish, "spellfixer", speller)
+
+
+def test_live_start_asks_only_questions_with_unknown_words(tmp_path, monkeypatch):
+    """NHM01 has no unknown word, NHM13 has one ("aviable"): with rewrite_if_unknown only NHM13 is sent."""
+    experiment = tmp_path / "live.yaml"
+    experiment.write_text(yaml.safe_dump({
+        "experiment": "live", "purpose": "test", "docs": ["nhm_hrh_2022"], "question_set": "all",
+        "query": {"front_end": "rewrite_if_unknown"}, "llm": {"pause": {"gemini": 0}},
+        "plan": [{"versions": ["v3b_med"], "models": ["gemini:test"]}], "format": "f0p", "runs": 2}), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(rewrite, "chat_full", lambda model, system, user, **options: calls.append(user) or {"text": user})
+    monkeypatch.setattr(run, "chat_full", forbidden)
+    monkeypatch.setattr(run, "select", lambda questions, config: [item for item in questions if item["qid"] in ("NHM01", "NHM13")])
+    folder, manifest, config, records = run.start(str(experiment), tmp_path / "runs")
+    by_qid = {record["qid"]: record for record in records}
+    assert calls == [by_qid["NHM13"]["question"]] and "rewrite" not in by_qid["NHM01"]
+    assert manifest["plan"]["rewrites"]["calls"] == 1 and manifest["plan"]["front_end"] == "rewrite_if_unknown"

@@ -41,3 +41,10 @@ def unknown_words(question: str, vocab, english) -> list[str]:
                 and word.lower() not in vocab and not english.known([word.lower()]):
             found.append(word)
     return found
+
+def needed(question: str, front_end: str, speller) -> bool:
+    """Does this question go to the live rewrite? (config query.front_end) spellfixer: never; rewrite: always;
+    rewrite_if_unknown: only when it has a word that is neither English nor in the PDF (unknown_words, C-032).
+    speller: the gate's SpellFixer, which holds the PDF vocabulary and the English dictionary."""
+    return front_end == "rewrite" or (front_end == "rewrite_if_unknown"
+                                      and bool(unknown_words(question, speller.vocab, speller.english)))

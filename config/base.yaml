@@ -7,9 +7,10 @@ normalize:
 
 query:                        # C-029: what is searched and graded
   front_end: spellfixer       # spellfixer = today (query.SpellFixer) | rewrite = live LLM English rewrite (src/rewrite.py)
+                              # | rewrite_if_unknown = rewrite only questions with unknown words (rewrite.needed, C-032)
   rewrite_model: gemini:gemini-3.5-flash-lite
   rewrite_version: r1         # prompts.REWRITES
-  
+
 retrieval:
   embed_model: BAAI/bge-small-en-v1.5        # vectordb.EMBED_MODEL
   rerank_model: Xenova/ms-marco-MiniLM-L-6-v2 # retriever.RERANK_MODEL
