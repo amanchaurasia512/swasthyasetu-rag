@@ -17,7 +17,8 @@ def trace_line(run_id: str, doc_id: str, record: dict, built: list[dict], second
     prepared = "action" in record
     return {
         "run_id": run_id, "qid": record["qid"], "doc_id": doc_id,
-        "normalize": {"fixed": record["fixed"], "changes": record["changes"]} if prepared else None,
+        "normalize": {"fixed": record["fixed"], "changes": record["changes"], "rewrite": record.get("rewrite")}
+        if prepared else None,
         "retrieve": {"hits": [{key: hit[key] for key in HIT_FACTS} for hit in record["hits"]]} if prepared else None,
         "gate": {"signals": record["signals"], "first": record["first"], "final": record["final"],
                  "rounds": 2 if record["first"] == "P" else 1, "action": record["action"]} if prepared else None,

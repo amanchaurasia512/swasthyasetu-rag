@@ -5,6 +5,11 @@ normalize:
   spell_cutoff: 0.8           # query.CUTOFF
   typo_min_len: 5             # corrective.TYPO_MIN_LEN
 
+query:                        # C-029: what is searched and graded
+  front_end: spellfixer       # spellfixer = today (query.SpellFixer) | rewrite = live LLM English rewrite (src/rewrite.py)
+  rewrite_model: gemini:gemini-3.5-flash-lite
+  rewrite_version: r1         # prompts.REWRITES
+  
 retrieval:
   embed_model: BAAI/bge-small-en-v1.5        # vectordb.EMBED_MODEL
   rerank_model: Xenova/ms-marco-MiniLM-L-6-v2 # retriever.RERANK_MODEL
@@ -18,6 +23,9 @@ gate:
   lower: -5.0                 # corrective.LOWER (= answer.MIN_RERANK_SCORE)
   upper: 0.0                  # corrective.UPPER
   re_retrieve_pool: 10        # corrective.POOL
+  m_action: scoped            # Corrective(m_action=...): scoped = fixed "does not cover" answer | answer = LLM with evidence (C-028)
+  p_notes: true               # Corrective(p_notes=...), prompts.build(notes=...): warning notes for grade P (C-028)
+  re_retrieve: true           # Corrective(re_retrieve=...): second search for grade P (C-028)
 
 evidence:
   context_top: 3              # answer.CONTEXT_TOP

@@ -84,6 +84,11 @@ def format_page_labels(question, hits):
     return (f"Question: {question}\n\nSources:\n\n" + "\n\n".join(blocks)
             + f"\n\nAnswer this question using the sources above: {question}\nAnswer:")
 
+# Query rewriting before search (Level 1 decision, C-029): the question in plain English for searching the document.
+REWRITES = {"r1": ("You rewrite a user's question so it can be used to search a document. Fix spelling mistakes. "
+                   "Translate any Hindi or Hinglish words into English. Keep every name, number, date, abbreviation and "
+                   "place exactly as written. Do not answer the question. Do not add, remove or guess any information. "
+                   "Reply with the rewritten question only, on one line.")}
 
 VERSIONS = {"v1": (answer_mod.SYSTEM_PROMPT, Corrective.notes_for),
             "v3b_med": (SYSTEM_V3B_MED, notes_v3b_med),
@@ -91,9 +96,10 @@ VERSIONS = {"v1": (answer_mod.SYSTEM_PROMPT, Corrective.notes_for),
 FORMATS = {"f0": answer_mod.build_prompt, "f1": format_source_label, "f2": format_markdown, "f0p": format_page_labels}
 
 
-def build(record, version, fmt):
-    """(system prompt, user prompt) for one question; notes are added only when the gate graded it P."""
+def build(record, version, fmt, notes: bool = True):
+    """(system prompt, user prompt) for one question; notes are added only when the gate graded it P and notes is on
+    (config gate.p_notes, C-028)."""
     system, notes_fn = VERSIONS[version]
-    notes = notes_fn(record["signals"]) if record["final"] == "P" else []
-    return system, ("Important: " + " ".join(notes) + "\n\n" if notes else "") + FORMATS[fmt](record["fixed"], record["hits"])
+    lines = notes_fn(record["signals"]) if notes and record["final"] == "P" else []
+    return system, ("Important: " + " ".join(lines) + "\n\n" if lines else "") + FORMATS[fmt](record["fixed"], record["hits"])
 

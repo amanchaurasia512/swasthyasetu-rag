@@ -5,7 +5,7 @@ import inspect
 
 import pytest
 
-from src import answer, chunker, corrective, evaluate, llm, paths, query, retriever, vectordb
+from src import answer, chunker, corrective, evaluate, llm, paths, prompts, query, retriever, vectordb
 from src.config import load, path_of
 from src.extract import nhm
 
@@ -65,6 +65,10 @@ LITERALS = [
     (corrective.Corrective.prepare, "self.R.search(fixed, k={retrieval.top_k})"),
     (corrective.Corrective.re_retrieve, "k: int = {retrieval.top_k}"),
     (corrective.Corrective.__init__, "refine: bool = {evidence.refine}"),
+    (corrective.Corrective.__init__, 'm_action: str = "{gate.m_action}"'),
+    (corrective.Corrective.__init__, "p_notes: bool = {gate.p_notes}"),
+    (corrective.Corrective.__init__, "re_retrieve: bool = {gate.re_retrieve}"),
+    (prompts.build, "notes: bool = {gate.p_notes}"),
     (llm._api, '"temperature": {llm.temperature}'),
     (llm._api, '"max_tokens": {llm.gemini.max_tokens}'),
     (llm._api, '"reasoning_effort": "{llm.gemini.reasoning_effort}"'),

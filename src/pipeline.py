@@ -73,17 +73,21 @@ def open_gate(config: dict) -> Corrective:
     """Retriever (BM25 + vectors + reranker) and the corrective gate, built from the document's files."""
     retriever = Retriever(path_of(config["files"]["chunks"]), path_of(config["index"]["vectordb"]),
                           collection=config["index"]["collection"])
-    return Corrective(retriever, SpellFixer(retriever.chunks), refine=config["evidence"]["refine"])
+    switches = config["gate"]
+    return Corrective(retriever, SpellFixer(retriever.chunks), refine=config["evidence"]["refine"],
+                      m_action=switches["m_action"], p_notes=switches["p_notes"], re_retrieve=switches["re_retrieve"])
 
 
-def prepare(record: dict, gate: Corrective) -> dict:
-    """The question record plus the fixed question, gate decision, signals and final hits (every hit field kept)."""
+def prepare(record: dict, gate: Corrective, asked: dict | None = None) -> dict:
+    """The question record plus the fixed question, gate decision, signals and final hits (every hit field kept).
+    asked: the live rewrite (src.rewrite.ask, config query.front_end = rewrite). It is kept in the record, so the
+    evidence shows what was searched; an empty or failed rewrite falls back to the SpellFixer (rule R5)."""
     try:
-        prepared = gate.prepare(record["question"])
+        prepared = gate.prepare(record["question"], asked["text"] if asked else None)
     except Exception as failure:              # rule R5: name the stage and question, keep going
         return {**record, "error": {"stage": "prepare", "qid": record["qid"],
                                     "type": type(failure).__name__, "message": str(failure)}}
-    return {**record, **{field: prepared[field] for field in PREPARED_FIELDS}}
+    return {**record, **({"rewrite": asked} if asked else {}), **{field: prepared[field] for field in PREPARED_FIELDS}}
 
 
 # ------------------------------------------------------------------ stage 6: prompt
@@ -91,9 +95,8 @@ def prompt_hash(system: str, user: str) -> str:
     """The same hash as E2's saved scoring input (C-003)."""
     return hashlib.sha256(f"{system}\n\n{user}".encode("utf-8")).hexdigest()[:12]
 
-
-def prompt(record: dict, version: str, fmt: str) -> dict:
-    """The exact prompt for one question, prompt version and format."""
-    system, user = prompts.build(record, version, fmt)
+def prompt(record: dict, version: str, fmt: str, notes: bool = True) -> dict:
+    """The exact prompt for one question, prompt version and format (notes: config gate.p_notes)."""
+    system, user = prompts.build(record, version, fmt, notes)
     return {"qid": record["qid"], "prompt_version": version, "format": fmt,
             "system": system, "prompt": user, "prompt_hash": prompt_hash(system, user)}

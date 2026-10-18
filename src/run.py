@@ -3,6 +3,8 @@
     python -m src.run --config config/experiments/e3.yaml                 new run: stages 1-6, plan, no calls
     python -m src.run --resume e3-20261020-1430                           what is still missing, no calls
     python -m src.run --resume e3-20261020-1430 --allow-api-calls         answer only the missing keys
+    An experiment with query.front_end: rewrite (C-029) asks the rewrite live while it prepares, so its new run needs
+    --allow-api-calls from the start; without the switch it only prints the plan and writes nothing.
 
 Writes runs/<run_id>/: manifest.json (the run's ID card), evidence.jsonl (stages 1-5, every hit field),
 traces.jsonl (one line per question), answers.csv (one row per answer, saved at once, with its exact prompt), run.log,
@@ -27,6 +29,7 @@ from src.config import config_hash, load, path_of
 from src.llm import LLMError, chat_full, provider_of, real_answer_check
 from src.paths import ROOT
 from dotenv import load_dotenv
+from src import evaluate, pipeline, rewrite, trace
 
 RUNS = ROOT / "runs"
 PACKAGES = ("chromadb", "fastembed", "onnxruntime", "rank-bm25", "snowballstemmer", "numpy", "pandas", "pyyaml")
@@ -84,6 +87,17 @@ def to_llm(records: list[dict]) -> list[dict]:
     return [record for record in records if record.get("action") in pipeline.TO_LLM]
 
 # ------------------------------------------------------------------ new run: stages 1-6
+def rewrite_plan(experiment: str) -> int:
+    """Live rewrite front end without --allow-api-calls: the run cannot be prepared (what is searched depends on the
+    rewrite), so nothing is written; the number of rewrite calls the real run will make is printed instead."""
+    config = load(experiment)
+    questions = len(select(pipeline.load_questions(config), config))
+    print(f"front end 'rewrite': {questions} rewrite calls ({config['query']['rewrite_model']}), then up to "
+          f"{questions * len(pairs(config)) * config['runs']} answer calls (the gate decides after the rewrite).\n"
+          f"No API calls made, nothing written. Start the run with --allow-api-calls.")
+    return questions
+
+
 def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]]:
     config = load(experiment)
     run_id = f"{config['experiment']}-{datetime.now():%Y%m%d-%H%M}"
@@ -104,24 +118,34 @@ def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]
     save_manifest(folder, manifest)
     log(folder, f"run {run_id} | {config['purpose']}")
 
-    gate = pipeline.open_gate(config)
+    gate, notes = pipeline.open_gate(config), config["gate"]["p_notes"]
+    rewriting = config["query"]["front_end"] == "rewrite"
+    pause = config["llm"]["pause"][provider_of(config["query"]["rewrite_model"])[0]]
     records = []
     for question in select(pipeline.load_questions(config), config):
+        asked = rewrite.ask(question["question"], config) if rewriting else None
+        if asked and asked["error"]:
+            log(folder, f"{question['qid']} rewrite failed, SpellFixer used: {asked['error'][:100]}")
         began = time.time()
-        record = pipeline.prepare(question, gate)
+        record = pipeline.prepare(question, gate, asked)
         prepared = time.time() - began
-        built = [pipeline.prompt(record, version, config["format"]) for version in versions(config)] \
+        built = [pipeline.prompt(record, version, config["format"], notes) for version in versions(config)] \
             if record.get("action") in pipeline.TO_LLM else []
-        seconds = {"prepare": round(prepared, 2), "prompt": round(time.time() - began - prepared, 3)}
+        seconds = {"rewrite": asked["seconds"] if asked else None, "prepare": round(prepared, 2),
+                   "prompt": round(time.time() - began - prepared, 3)}
         trace.append(folder / "evidence.jsonl", record)
         trace.append(folder / "traces.jsonl", trace.trace_line(run_id, config["doc_id"], record, built, seconds))
         log(folder, trace.log_line(record, prepared))
         records.append(record)
+        time.sleep(pause if asked else 0)
+    asked_all = [record["rewrite"] for record in records if "rewrite" in record]
     manifest["plan"] |= {"questions": len(records), "to_llm": len(to_llm(records)),
-                         "planned_calls": len(to_llm(records)) * len(pairs(config)) * config["runs"]}
+                         "planned_calls": len(to_llm(records)) * len(pairs(config)) * config["runs"],
+                         "front_end": config["query"]["front_end"],
+                         "rewrites": {"calls": len(asked_all), "failed": sum(bool(item["error"]) for item in asked_all),
+                                      "seconds": round(sum(item["seconds"] for item in asked_all), 1)}}
     save_manifest(folder, manifest)
     return folder, manifest, config, records
-
 # ------------------------------------------------------------------ resumed run: same folder, same evidence
 def reopen(folder: Path) -> tuple[Path, dict, dict, list[dict]]:
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
@@ -159,7 +183,7 @@ def answer_pair(folder: Path, run_id: str, config: dict, model: str, version: st
     except LLMError as error:
         return f"skipped - probe failed: {str(error)[:150]}"
     for number, (run, record) in enumerate(jobs, 1):
-        built = pipeline.prompt(record, version, config["format"])
+        built = pipeline.prompt(record, version, config["format"], config["gate"]["p_notes"])
         started, began = now(), time.time()
         try:
             reply = chat_full(model, built["system"], built["prompt"], timeout=llm["timeout"], tries=llm["tries"])
@@ -220,7 +244,7 @@ def score(folder: Path, config: dict, records: list[dict]) -> dict:
 
 # ------------------------------------------------------------------ the command
 
-def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
+def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path | None:
     parser = argparse.ArgumentParser(description="SwasthyaSetu runner (dry run unless --allow-api-calls)")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--config", help="experiment file, e.g. config/experiments/e3.yaml (starts a new run)")
@@ -228,6 +252,11 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
     parser.add_argument("--allow-api-calls", action="store_true", help="really call the models")
     args = parser.parse_args(argv)
 
+    if args.config and load(args.config)["query"]["front_end"] == "rewrite" and not args.allow_api_calls:
+        rewrite_plan(args.config)
+        return None
+    if args.allow_api_calls:
+        load_dotenv(ROOT / ".env", override=True)
     folder, manifest, config, records = reopen(runs_dir / args.resume) if args.resume else start(args.config, runs_dir)
     jobs = pending(records, config, saved_keys(folder))
     total = sum(len(pair_jobs) for pair_jobs in jobs.values())
@@ -237,7 +266,6 @@ def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> Path:
     entry = {"at": now(), "pending_before": total, "api_calls": args.allow_api_calls, "results": {}}
 
     if args.allow_api_calls:
-        load_dotenv(ROOT / ".env", override=True)
         manifest["status"] = "running"
         save_manifest(folder, manifest)
         for (model, version), pair_jobs in jobs.items():

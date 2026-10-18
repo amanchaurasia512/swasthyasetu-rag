@@ -2,7 +2,6 @@
 prepared once (stages 1-5). tests/test_retrieval.py and tests/test_pipeline.py both read them, so the 173
 questions go through retrieval one time instead of two (local models, no API calls)."""
 import pytest
-
 from src import pipeline
 from src.config import load
 

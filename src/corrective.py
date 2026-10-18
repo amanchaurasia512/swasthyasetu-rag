@@ -61,15 +61,18 @@ def norm(text: str) -> str:
 
 class Corrective:
     
-    def __init__(self, retriever, speller, refine: bool = True):
+    def __init__(self, retriever, speller, refine: bool = True, m_action: str = "scoped", p_notes: bool = True,
+                 re_retrieve: bool = True):
+        """m_action: 'scoped' = fixed "does not cover" answer for grade M, 'answer' = send it to the LLM with its evidence;
+        p_notes: warning notes for grade P; re_retrieve: second search for grade P (C-028 switches, config 'gate')."""
         self.R = retriever
         self.SP = speller
         self.refine_on = refine
+        self.m_action, self.p_notes, self.re_retrieve_on = m_action, p_notes, re_retrieve
         self.corpus_stems = {s for c in retriever.chunks for s in self.stems(c["embed_text"])}
         self.pdf_numbers = {n for c in retriever.chunks for n in re.findall(r"\d+(?:-\d+)?", norm(c["text"]))}
         self.word_counts = Counter(w for c in retriever.chunks for w in re.findall(r"[a-z][a-z0-9]+", norm(c["embed_text"])))
         self.acronyms = Counter(a for c in retriever.chunks for a in re.findall(r"\b[A-Z][A-Z0-9]{1,}\b", c["embed_text"]))
-
     # ------------------------------------------------------------------ typos in capitalised words / acronyms
     def typo_match(self, word: str):
         """The PDF word this word is a slip of, or None. Acronyms: only swapped letters (DMC -> DCM);
@@ -182,17 +185,18 @@ class Corrective:
         return notes
 
     # ------------------------------------------------------------------ the whole layer for one question
- 
-    def prepare(self, question: str) -> dict:
-        """Everything before the LLM call. 'prompt' is empty when the answer is fixed (reject / scoped)."""
-        fixed, changes = self.SP.fix(question)
+    def prepare(self, question: str, rewrite: str | None = None) -> dict:
+        """Everything before the LLM call. 'prompt' is empty when the answer is fixed (reject / scoped).
+        rewrite: the LLM's English rewrite of the question (config query.front_end = rewrite, C-029); it replaces
+        the SpellFixer step, aliases and the capitalised-typo fix still run on it."""
+        fixed, changes = (rewrite, []) if rewrite else self.SP.fix(question)
         fixed = expand_aliases(fixed)                 # MP -> Madhya Pradesh (shows in the 'fixed' column)
         fixed, typo_changes = self.correct_typos(fixed)   # Recruiment -> recruitment, DMC -> DCM
         changes = list(changes) + typo_changes
         hits = self.R.search(fixed, k=5)
         sig = self.signals(fixed, hits)
         first = final = self.grade(sig)
-        if first == "P":
+        if first == "P" and self.re_retrieve_on:
             hits = self.re_retrieve(fixed, sig)
             sig = self.signals(fixed, hits)
             final = self.grade(sig)
@@ -200,11 +204,11 @@ class Corrective:
                 "signals": sig, "hits": hits, "hit_ids": ";".join(h["chunk_id"] for h in hits)}
         if final == "I":
             return {**base, "action": "reject", "fixed_answer": answer_mod.NOT_FOUND, "prompt": "", "notes": ""}
-        if final == "M":
+        if final == "M" and self.m_action == "scoped":
             terms = ", ".join(sig["hard_out"])
             scoped = f"The guideline does not cover {terms}. It covers human resources under the National Health Mission (NHM) only."
             return {**base, "action": "scoped", "fixed_answer": scoped, "prompt": "", "notes": ""}
-        notes = self.notes_for(sig) if final == "P" else []
+        notes = self.notes_for(sig) if final == "P" and self.p_notes else []
         hits = answer_mod.add_context(hits, self.R)
         hits = self.refine(hits, fixed) if self.refine_on else hits
         prompt = ("Important: " + " ".join(notes) + "\n\n" if notes else "") + answer_mod.build_prompt(fixed, hits)
