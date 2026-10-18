@@ -18,6 +18,10 @@ index:
 extractor:
   letter_parent: "Annexure II: Compendium of Letters"   # extract/nhm.LETTER_PARENT
 
+names:                                     # C-030: this PDF's own names (people, places, schemes)
+  candidates: data/names/candidates.xlsx   # machine list, noisy: python -m src.names candidates
+  reviewed: data/names/names.xlsx          # the author's reviewed copy; rows with keep = yes are the name list
+  
 not_found: "Not found in the guideline."   # answer.NOT_FOUND (= evaluate.NOT_FOUND)
 
 aliases:                                   # corrective.ALIASES (Indian short forms this PDF writes out)
