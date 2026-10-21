@@ -45,13 +45,14 @@ chunker:
 
 llm:
   temperature: 0              # llm._api payload, llm.OPTIONS
-  api_max_tokens: 2048        # llm.API_MAX_TOKENS
+  api_max_tokens: 4096        # llm.API_MAX_TOKENS
   gemini: {max_tokens: 4096, reasoning_effort: low}   # llm._api, gemini branch
+  sarvam: {max_tokens: 4096, reasoning_effort: low}   # llm._api, sarvam branch (C-036)
   gpt_oss: {reasoning_effort: low}                    # llm._api, "gpt-oss" branch
   ollama: {num_ctx: 4096, num_predict: 512}           # llm.OPTIONS
   timeout: 120                # notebook 15.11a TIMEOUT
   tries: 2                    # notebook 15.11a TRIES
-  pause: {groq: 20, gemini: 5, nvidia: 3, openrouter: 4, ollama: 0}   # notebook 15.11a PAUSE
+  pause: {groq: 20, gemini: 5, nvidia: 3, openrouter: 4, sarvam: 2, ollama: 0}   # notebook 15.11a PAUSE; sarvam: 40 requests/min on-starter
 
 scoring:
   tau: 0.5                    # evaluate.TAU

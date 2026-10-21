@@ -1,0 +1,31 @@
+# E6: model comparison (C-036). E5's settings with eight answer models in ONE run, so every model answers exactly the
+# same prompts (one front end, one rewrite per question, one gate decision). Only the answer model differs; the rewrite
+# stays Gemini. tests/test_e5.py checks that E6 differs from E5 only in its models. Fast models first, Groq last
+# (20 s pause on its free tier); a model that stops (quota) leaves the others intact - continue with --resume.
+
+experiment: e6
+purpose: "E6: eight answer models on E5 settings (same evidence and prompts); v3b_med + f0p; 2 runs"
+docs: [nhm_hrh_2022]
+question_set: all
+questions:
+  new: {file: data/eval/benchmark/new_questions_12.xlsx}
+  removed: [C-019, C-003, NHM01, C-029, C-051, C-036, C-037, NHM06, NHM10, C-018]   # same as E3
+query:
+  front_end: rewrite_if_unknown   # C-032
+gate:
+  m_action: answer                # C-027/C-028
+  p_notes: false                  # C-025
+  re_retrieve: false              # C-025
+plan:
+  - versions: [v3b_med]
+    models:
+      - gemini:gemini-3.5-flash-lite
+      - sarvam:sarvam-105b
+      - nvidia:google/gemma-4-31b-it
+      - nvidia:nvidia/nemotron-3-super-120b-a12b
+      - nvidia:z-ai/glm-5.3-flash
+      - groq:openai/gpt-oss-120b
+      - groq:openai/gpt-oss-20b
+      - groq:qwen/qwen3.8-27b
+format: f0p
+runs: 2

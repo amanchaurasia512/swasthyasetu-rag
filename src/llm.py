@@ -27,8 +27,10 @@ from src.ollama_server import OLLAMA_URL, OllamaError, ensure_ollama
 API = {"groq": ("https://api.groq.com/openai/v1/chat/completions", "GROQ_API_KEY"),
        "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "GEMINI_API_KEY"),
        "nvidia": ("https://integrate.api.nvidia.com/v1/chat/completions", "NVIDIA_API_KEY"),
-       "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
-API_MAX_TOKENS = 2048                          # room for long lists and for a reasoning model's short thinking
+        "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY"),
+       "sarvam": ("https://api.sarvam.ai/v1/chat/completions", "SARVAM_API_KEY")}
+       
+API_MAX_TOKENS = 4096                          # one generous limit for every API model, so a comparison is fair (C-036)
 OPTIONS = {"temperature": 0, "num_ctx": 4096, "num_predict": 512}
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
@@ -69,6 +71,8 @@ def _api(provider: str, name: str, messages: list[dict], timeout: int):
     if "gpt-oss" in name:                      # reasoning model: think briefly and leave room for the answer
         payload["reasoning_effort"] = "low"
     if provider == "gemini":                   # Gemini 3.x thinks by default: keep it low, leave room for long lists
+        payload.update({"reasoning_effort": "low", "max_tokens": 4096})
+    if provider == "sarvam":                   # Sarvam 105B reasons by default (medium); thinking counts in max_tokens
         payload.update({"reasoning_effort": "low", "max_tokens": 4096})
     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}
     reply = requests.post(url, json=payload, timeout=timeout, headers=headers)

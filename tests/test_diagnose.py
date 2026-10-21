@@ -2,7 +2,7 @@
 the expected lost_at. It uses no NHM data, so it stays valid for any document.
 Run from the project root:   python -m pytest tests/test_diagnose.py -q      (no models, no API calls; seconds)"""
 import json
-
+import shutil
 import pandas as pd
 import pytest
 
@@ -99,3 +99,17 @@ def test_index_has_one_row_per_run_with_stage_counts(runs_dir):
     index = pd.read_csv(runs_dir / "index.csv")
     assert index.run_id.tolist() == ["t-20261017-1200"]
     assert index.loc[0, "lost_at_ok"] == 2 and index.loc[0, "lost_at_gate"] == 1 and index.loc[0, "date"] == "2026-10-17"
+
+def test_a_run_with_several_models_is_diagnosed_one_model_at_a_time(runs_dir):
+    """C-036: answers of two models are never mixed as runs of one; each model gets its own report."""
+    folder = runs_dir / "t2-20261019-1200"
+    shutil.copytree(runs_dir / "t-20261017-1200", folder)
+    scored = pd.read_csv(folder / "scored.csv")
+    both = pd.concat([scored.assign(model="groq:a/b"), scored.assign(model="sarvam:c", refused=True)])
+    both.to_csv(folder / "scored.csv", index=False)
+    with pytest.raises(SystemExit, match="2 models"):
+        diagnose.main([folder.name], runs_dir=runs_dir)
+    first = diagnose.main([folder.name, "--model", "groq:a/b"], runs_dir=runs_dir)
+    assert dict(zip(first.qid, first.lost_at)) == EXPECTED_STAGE and (folder / "report_groq_a_b.csv").exists()
+    second = diagnose.main([folder.name, "--model", "sarvam:c"], runs_dir=runs_dir)
+    assert dict(zip(second.qid, second.lost_at))["Q-ok"] == "llm_refused"

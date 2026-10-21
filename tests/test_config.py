@@ -109,3 +109,11 @@ def test_literal_still_in_code(function, text):
 def test_no_secrets_and_no_api_switch_in_config():
     flat = str(CONFIG).lower()
     assert not any(word in flat for word in ("api_key", "token:", "allow_api_calls", "github_pat"))
+
+@pytest.mark.parametrize("experiment", sorted(path.name for path in (paths.ROOT / "config" / "experiments").glob("*.yaml")))
+def test_every_planned_model_has_a_pause(experiment):
+    """C-036: the runner reads llm.pause[provider] for every model in the plan; a provider missing there stopped E6
+    after its first model (KeyError 'sarvam'). Checked for every experiment file, before any run."""
+    config = load(f"config/experiments/{experiment}")
+    providers = {llm.provider_of(model)[0] for group in config["plan"] for model in group["models"]}
+    assert providers <= set(config["llm"]["pause"]), providers - set(config["llm"]["pause"])

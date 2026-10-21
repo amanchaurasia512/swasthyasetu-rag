@@ -7,7 +7,9 @@ Ideas credited (see the restructure report, References): RAGChecker (Ru et al., 
 generator separately by claim recall and context utilization; Seven Failure Points (Barnett et al., CAIN 2024) - the
 stage labels (missing content, missed top-ranked documents, not in context, not extracted / incomplete).
 
-    python -m src.diagnose e3-20261017-1200     writes runs/<run_id>/report.csv and rebuilds runs/index.csv
+        python -m src.diagnose e6-20261019-1400 --model groq:openai/gpt-oss-120b
+                                                 a run with several models: one report per model (C-036),
+                                                 runs/<run_id>/report_<model>.csv
 """
 from __future__ import annotations
 
@@ -77,9 +79,9 @@ def question_row(record: dict, answers: pd.DataFrame, chunk_text: dict) -> dict:
         "expected": record["expected"],
     }
 
-
-def report(folder: Path) -> pd.DataFrame:
-    """One row per question of the run, with lost_at."""
+def report(folder: Path, model: str | None = None) -> pd.DataFrame:
+    """One row per question of the run, with lost_at. A run with several models needs model: the answers of
+    different models are never mixed as if they were runs of one model."""
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     with open(path_of(manifest["config"]["merged"]["files"]["chunks"]), encoding="utf-8") as file:
         chunk_text = {chunk["chunk_id"]: labelled(chunk) for chunk in map(json.loads, file)}
@@ -87,6 +89,11 @@ def report(folder: Path) -> pd.DataFrame:
         records = [json.loads(line) for line in file]
     scored = pd.read_csv(folder / "scored.csv") if (folder / "scored.csv").exists() else pd.DataFrame(
         columns=["qid", "run", "answer", "refused", "correctness"])
+    models = sorted(scored.model.dropna().unique()) if "model" in scored else []
+    if model is None and len(models) > 1:
+        raise SystemExit(f"{folder.name} has answers from {len(models)} models - add --model, one of: {', '.join(models)}")
+    if model is not None:
+        scored = scored[scored.model == model]
     rows = [question_row(record, scored[scored.qid == record["qid"]], chunk_text) for record in records]
     table = pd.DataFrame(rows)
     table.insert(3, "lost_at", [lost_at(row) for row in rows])
@@ -113,17 +120,22 @@ def index_row(folder: Path) -> dict:
         row |= {f"lost_at_{stage}": int(counts.get(stage, 0)) for stage in STAGES}
     return row
 
+def report_name(model: str | None) -> str:
+    """report.csv for a one-model run; report_<model>.csv (':' and '/' as '_') for one model of several."""
+    return "report.csv" if model is None else f"report_{model.replace(':', '_').replace('/', '_')}.csv"
+
 
 def main(argv: list[str] | None = None, runs_dir: Path = RUNS) -> pd.DataFrame:
     parser = argparse.ArgumentParser(description="Diagnose one run (no API calls)")
     parser.add_argument("run_id")
+    parser.add_argument("--model", help="for a run with several models: diagnose this one")
     args = parser.parse_args(argv)
     folder = runs_dir / args.run_id
-    table = report(folder)
-    table.to_csv(folder / "report.csv", index=False)
+    table = report(folder, args.model)
+    table.to_csv(folder / report_name(args.model), index=False)
     index = pd.DataFrame([index_row(run) for run in sorted(runs_dir.iterdir()) if (run / "manifest.json").exists()])
     index.sort_values(["date", "run_id"]).to_csv(runs_dir / "index.csv", index=False)
-    print(f"{args.run_id}: {len(table)} questions -> report.csv")
+    print(f"{args.run_id}{' | ' + args.model if args.model else ''}: {len(table)} questions -> {report_name(args.model)}")
     print(table.lost_at.value_counts().reindex(STAGES, fill_value=0).to_string())
     return table
 
