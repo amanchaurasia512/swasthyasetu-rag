@@ -121,13 +121,18 @@ def self_check(col, chunks: list[dict], embedder, n: int = 5) -> bool:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Check or rebuild the SwasthyaSetu vector database")
+    from src.config import load, path_of
+
+    parser = argparse.ArgumentParser(description="Check or rebuild the SwasthyaSetu vector database of one document")
     parser.add_argument("--rebuild", action="store_true", help="embed every chunk again")
+    parser.add_argument("--doc", help="document id from config/docs (default: the NHM document)")
     args = parser.parse_args()
-    chunks = load_chunks()
-    report = status(chunks)
-    print({key: (value if not isinstance(value, list) else len(value)) for key, value in report.items()})
+    config = load(doc=args.doc)
+    chunks = load_chunks(path_of(config["files"]["chunks"]))
+    db_dir, collection = path_of(config["index"]["vectordb"]), config["index"]["collection"]
+    report = status(chunks, db_dir, collection)
+    print(config["doc_id"], {key: (value if not isinstance(value, list) else len(value)) for key, value in report.items()})
     if args.rebuild or not report["up_to_date"]:
         embedder = load_embedder()
-        col = open_collection(chunks, lambda: embedder, rebuild=args.rebuild)
+        col = open_collection(chunks, lambda: embedder, db_dir, collection, rebuild=args.rebuild)
         self_check(col, chunks, embedder)

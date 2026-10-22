@@ -21,10 +21,13 @@ TAU = 0.5                                   # a fact set counts as covered when 
 NOT_FOUND = "Not found in the guideline."
 REFUSAL_PHRASES = ("not found in the guideline", "does not cover", "do not cover", "does not mention", "do not mention",
                    "not covered", "no information", "not in the guideline", "not given", "not mentioned", "no mention",
-                   "do not contain", "does not contain")
+                   "do not contain", "does not contain", "not found in the fact sheets")   # C-044: NFHS-6 not-found reply
+
 REFUSE_FIRST_COUNTS = False   # Option 1 (strict). True = Option 2: "Not covered for X; the guideline gives Y for Z" is a refusal
+
 LONG_REQUEST = re.compile(r"\b(list|all|steps?|process|procedure|forms?|format|letters?|message|explain|describe|"
                           r"components?|responsibilit\w*|duties|contents?|roadmap|phases?)\b", re.I)
+
 STOP_WORDS = set("""the a an and or of to in on for by with from as at is are be this that these those it its which what who
 will can may should must also each every other than then into per not no any all their there here such has have had
 was were been being if when where how does do done only more most some your you them they given give gives""".split())

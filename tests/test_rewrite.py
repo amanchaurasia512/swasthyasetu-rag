@@ -121,3 +121,10 @@ def test_live_start_asks_only_questions_with_unknown_words(tmp_path, monkeypatch
     by_qid = {record["qid"]: record for record in records}
     assert calls == [by_qid["NHM13"]["question"]] and "rewrite" not in by_qid["NHM01"]
     assert manifest["plan"]["rewrites"]["calls"] == 1 and manifest["plan"]["front_end"] == "rewrite_if_unknown"
+
+def test_a_question_in_hindi_script_goes_to_the_rewrite():
+    """C-043: Devanagari words are never English and never in the PDF, so a Hindi question is always rewritten;
+    symbols and English words are not affected."""
+    english = SpellChecker()
+    assert rewrite.unknown_words("महाराष्ट्र में तंबाकू का प्रतिशत क्या है?", set(), english)
+    assert rewrite.unknown_words("What is the rate (≥140 mm of Hg) in Bihar?", {"bihar", "mm", "hg"}, english) == []

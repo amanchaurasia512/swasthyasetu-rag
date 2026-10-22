@@ -49,9 +49,10 @@ LOG_COLUMNS = ["time", "session", "question", "follow_up", "front_rewrite", "gra
 UNAVAILABLE = "Sorry, the answer service is not reachable right now. Please try again in a minute."
 
 REWRITE_SYSTEM = """You rewrite the user's latest message into ONE complete, standalone question about the
-NHM Human Resources for Health guideline. Use the conversation only to fill in what the message refers to
+"{title}". Use the conversation only to fill in what the message refers to
 (e.g. "it", "they", "and Bihar?"). If the message is already a complete question on a new topic, return it
 unchanged. Do not answer. Output only the question."""
+
 
 CLARIFY_SYSTEM = """You decide whether a question is too vague to answer from the numbered sources.
 If the sources give DIFFERENT answers for different posts, states, programmes or situations and the question
@@ -103,10 +104,9 @@ class ChatSession:
 
     def standalone(self, message: str) -> str:
         user = f"Conversation so far:\n{self.history_text()}\n\nLatest message: {message}\n\nStandalone question:"
-        reply = self.llm(REWRITE_SYSTEM, user).strip()
+        reply = self.llm(REWRITE_SYSTEM.format(title=self.config["title"]), user).strip()
         rewritten = reply.splitlines()[0].strip().strip('"') if reply else ""
         return rewritten if 3 <= len(rewritten) <= 4 * len(message) + 200 else message
-
     # ------------------------------------------------------------------ clarification
     @staticmethod
     def looks_vague(question: str, record: dict) -> bool:
@@ -145,7 +145,7 @@ class ChatSession:
             answer, action = record["fixed_answer"], record["action"]
             if action in pipeline.TO_LLM:
                 built = pipeline.prompt(record, self.settings["version"], self.settings["format"],
-                                        self.config["gate"]["p_notes"])
+                                        self.config["gate"]["p_notes"], pipeline.document(self.config))
                 clarify = self.clarifying_question(built["prompt"]) \
                     if self.settings["clarify"] and not clarified and self.looks_vague(question, record) else ""
                 if clarify:

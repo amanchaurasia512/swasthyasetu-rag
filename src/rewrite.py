@@ -31,7 +31,8 @@ def unknown_words(question: str, vocab, english) -> list[str]:
     (vocab: lower-case words of the chunks). Any such word sends the question to the rewrite (C-032). Words the
     rewrite must keep as written (prompts.REWRITES) never count: ALL-CAPS abbreviations and capitalised words inside
     a sentence ("ICU", "Infosys"); the first word of a sentence still counts ("Probaton kitne ..."). Single letters,
-    numbers and contractions ("I've") are left out."""
+    numbers and contractions ("I've") are left out. A word in another script (Devanagari: "महाराष्ट्र") is never
+    English and never in an English PDF, so it always counts (C-043)."""
     found = []
     for match in re.finditer(r"[A-Za-z]+(?:'[A-Za-z]+)?", question):
         word, before = match.group(), question[:match.start()].rstrip()
@@ -40,7 +41,8 @@ def unknown_words(question: str, vocab, english) -> list[str]:
         if len(word) > 1 and "'" not in word and not kept_as_written \
                 and word.lower() not in vocab and not english.known([word.lower()]):
             found.append(word)
-    return found
+    return found + [token.strip("?.,!;:()\"'") for token in question.split()
+                    if any(char.isalpha() and not char.isascii() for char in token)]
 
 def needed(question: str, front_end: str, speller) -> bool:
     """Does this question go to the live rewrite? (config query.front_end) spellfixer: never; rewrite: always;

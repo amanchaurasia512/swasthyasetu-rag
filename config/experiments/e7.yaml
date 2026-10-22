@@ -1,0 +1,21 @@
+# E7: the second document (NFHS-6 fact sheets) with the chatbot's settings - the same model, prompt, format, gate
+# decisions and runs as E5, so the difference between E5 and E7 is the document. Questions: C-045 (answers from the
+# indicator table).
+
+experiment: e7
+purpose: "E7: NFHS-6 fact sheets with the E5/chatbot settings; Gemini flash-lite + v3b_med + f0p; 2 runs"
+docs: [nfhs6]
+question_set: all
+questions:
+  new: {file: data/eval/nfhs6/questions_e7.csv}
+query:
+  front_end: rewrite_if_unknown   # C-032
+gate:
+  m_action: answer                # C-027/C-028
+  p_notes: false                  # C-025
+  re_retrieve: false              # C-025
+plan:
+  - versions: [v3b_med]
+    models: [gemini:gemini-3.5-flash-lite]
+format: f0p
+runs: 2

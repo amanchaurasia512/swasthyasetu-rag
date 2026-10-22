@@ -10,25 +10,38 @@ FORMAT_RULES = """When you answer:
 - Tables: read row by row and keep each value with its row and column names. For "only" questions, choose rows where that column is Yes and the other columns are No.
 - Length: for a single fact, answer in 1-3 sentences. When the question asks for a list, steps, a process, a form, a letter or "all" items, give every item from the sources as a bullet list."""
 
-SYSTEM_V3B_MED = f"""You answer questions about the "Guidelines on Human Resources for Health for NHM (2022)".
+NHM = {"title": "Guidelines on Human Resources for Health for NHM (2022)", "word": "guideline", "outside": "NHM rules",
+       "not_found": answer_mod.NOT_FOUND}
+
+
+def system_v3b_med(doc: dict) -> str:
+    """The v3b_med system prompt for one document (C-040): title, the word for it, what not to add and the not-found
+    reply come from the document config. With NHM it is the E2 prompt character for character."""
+    return f"""You answer questions about the "{doc['title']}".
 First decide how to answer. Check these in order and use the FIRST that applies:
-1. The question is about an organisation, place or topic the sources do not mention: reply only "The guideline does not cover <it>." Do not add NHM rules.
+1. The question is about an organisation, place or topic the sources do not mention: reply only "The {doc['word']} does not cover <it>." Do not add {doc['outside']}.
 2. The question states something as true that the sources contradict: correct it with the value the sources state.
-3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply only "The guideline does not cover this for <the one asked>." Do not give the other one's value.
-4. The sources answer only part of the question: answer that part, then say which part the guideline does not cover.
-5. None of the sources contains any answer: reply exactly: {answer_mod.NOT_FOUND}
+3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply only "The {doc['word']} does not cover this for <the one asked>." Do not give the other one's value.
+4. The sources answer only part of the question: answer that part, then say which part the {doc['word']} does not cover.
+5. None of the sources contains any answer: reply exactly: {doc['not_found']}
 6. Otherwise answer the question.
 {FORMAT_RULES}"""
 
-SYSTEM_V3B_STRICT = f"""You answer questions about the "Guidelines on Human Resources for Health for NHM (2022)".
+
+def system_v3b_strict(doc: dict) -> str:
+    """The v3b_strict system prompt for one document (C-040); with NHM it is the E2 prompt character for character."""
+    return f"""You answer questions about the "{doc['title']}".
 First decide how to answer. Check these in order and use the FIRST that applies:
-1. The question is about an organisation, place or topic the sources do not mention: reply exactly: {answer_mod.NOT_FOUND}
-2. The question states something as true that the sources contradict: correct it, but only if a source states the correct value directly; otherwise reply exactly: {answer_mod.NOT_FOUND}
-3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply exactly: {answer_mod.NOT_FOUND}
-4. The sources do not state the answer to EVERY part of the question: reply exactly: {answer_mod.NOT_FOUND}
+1. The question is about an organisation, place or topic the sources do not mention: reply exactly: {doc['not_found']}
+2. The question states something as true that the sources contradict: correct it, but only if a source states the correct value directly; otherwise reply exactly: {doc['not_found']}
+3. The question asks about one state, year, cadre or letter, and the sources give it only for a different one: reply exactly: {doc['not_found']}
+4. The sources do not state the answer to EVERY part of the question: reply exactly: {doc['not_found']}
 5. Otherwise answer the question.
 {FORMAT_RULES}"""
 
+
+SYSTEM_V3B_MED = system_v3b_med(NHM)
+SYSTEM_V3B_STRICT = system_v3b_strict(NHM)
 
 def notes_v3b_med(sig):
     """Weak-evidence notes that agree with SYSTEM_V3B_MED (refuse the out-of-scope part, never fill it with NHM rules)."""
@@ -93,13 +106,16 @@ REWRITES = {"r1": ("You rewrite a user's question so it can be used to search a 
 VERSIONS = {"v1": (answer_mod.SYSTEM_PROMPT, Corrective.notes_for),
             "v3b_med": (SYSTEM_V3B_MED, notes_v3b_med),
             "v3b_strict": (SYSTEM_V3B_STRICT, notes_v3b_strict)}
+SYSTEMS = {"v3b_med": system_v3b_med, "v3b_strict": system_v3b_strict}     # C-040: versions that name the document
+
 FORMATS = {"f0": answer_mod.build_prompt, "f1": format_source_label, "f2": format_markdown, "f0p": format_page_labels}
 
 
-def build(record, version, fmt, notes: bool = True):
+def build(record, version, fmt, notes: bool = True, doc: dict | None = None):
     """(system prompt, user prompt) for one question; notes are added only when the gate graded it P and notes is on
-    (config gate.p_notes, C-028)."""
+    (config gate.p_notes, C-028). doc: how the system prompt names the document (pipeline.document); None = NHM."""
     system, notes_fn = VERSIONS[version]
+    system = SYSTEMS[version](doc) if doc and version in SYSTEMS else system
     lines = notes_fn(record["signals"]) if notes and record["final"] == "P" else []
     return system, ("Important: " + " ".join(lines) + "\n\n" if lines else "") + FORMATS[fmt](record["fixed"], record["hits"])
 

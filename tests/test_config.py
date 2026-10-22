@@ -5,7 +5,7 @@ import inspect
 
 import pytest
 
-from src import answer, chunker, corrective, evaluate, llm, paths, prompts, query, retriever, vectordb
+from src import answer, chunker, corrective, evaluate, llm, paths, pipeline, prompts, query, retriever, vectordb
 from src.config import load, path_of
 from src.extract import nhm
 
@@ -117,3 +117,14 @@ def test_every_planned_model_has_a_pause(experiment):
     config = load(f"config/experiments/{experiment}")
     providers = {llm.provider_of(model)[0] for group in config["plan"] for model in group["models"]}
     assert providers <= set(config["llm"]["pause"]), providers - set(config["llm"]["pause"])
+
+def test_a_document_can_be_chosen_without_an_experiment_file():
+    """C-040: load(doc=...) picks the document directly (python -m src.vectordb --doc ...); the default stays NHM."""
+    assert load(doc="nhm_hrh_2022") == CONFIG
+
+def test_second_document_has_its_own_files_index_and_names():
+    """C-041: the NFHS-6 document brings its own chunks, index folder, collection and prompt names; NHM stays as it is."""
+    nfhs, doc = load(doc="nfhs6"), pipeline.document(load(doc="nfhs6"))
+    assert nfhs["files"]["chunks"] != CONFIG["files"]["chunks"]
+    assert (nfhs["index"]["vectordb"], nfhs["index"]["collection"]) != (CONFIG["index"]["vectordb"], CONFIG["index"]["collection"])
+    assert "NHM" not in prompts.system_v3b_med(doc) and load() == CONFIG

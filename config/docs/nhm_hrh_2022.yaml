@@ -24,6 +24,11 @@ names:                                     # C-030: this PDF's own names (people
   
 not_found: "Not found in the guideline."   # answer.NOT_FOUND (= evaluate.NOT_FOUND)
 
+
+prompt:                                    # C-040: how the system prompts name this document (prompts.system_v3b_med)
+  word: guideline                          # "The guideline does not cover <it>."
+  outside: NHM rules                       # "Do not add NHM rules."
+
 aliases:                                   # corrective.ALIASES (Indian short forms this PDF writes out)
   MP: Madhya Pradesh
   UP: Uttar Pradesh

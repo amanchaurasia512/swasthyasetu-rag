@@ -62,10 +62,11 @@ def save_manifest(folder: Path, manifest: dict) -> None:
 
 # ------------------------------------------------------------------ what this run uses
 def input_files(config: dict) -> dict:
+    """The files a run reads (fingerprinted in the manifest); a document's experiment may have only some question
+    sets and no screen (C-044)."""
     sets = config["questions"]
-    return {**{name: sets[name]["file"] for name in ("manual", "set_C", "negatives")},
-            **({"new": sets["new"]["file"]} if "new" in sets else {}),
-            "screen": sets["screen"], "chunks": config["files"]["chunks"]}
+    return {**{name: sets[name]["file"] for name in ("manual", "set_C", "negatives", "new") if name in sets},
+            **({"screen": sets["screen"]} if "screen" in sets else {}), "chunks": config["files"]["chunks"]}
 
 def fingerprints(config: dict) -> dict:
     return {name: file_hash(path_of(relative)) for name, relative in input_files(config).items()}
@@ -122,7 +123,7 @@ def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]
     save_manifest(folder, manifest)
     log(folder, f"run {run_id} | {config['purpose']}")
 
-    gate, notes = pipeline.open_gate(config), config["gate"]["p_notes"]
+    gate, notes, doc = pipeline.open_gate(config), config["gate"]["p_notes"], pipeline.document(config)
     pause = config["llm"]["pause"][provider_of(config["query"]["rewrite_model"])[0]]
     records = []
     for question in select(pipeline.load_questions(config), config):
@@ -133,7 +134,7 @@ def start(experiment: str, runs_dir: Path) -> tuple[Path, dict, dict, list[dict]
         began = time.time()
         record = pipeline.prepare(question, gate, asked)
         prepared = time.time() - began
-        built = [pipeline.prompt(record, version, config["format"], notes) for version in versions(config)] \
+        built = [pipeline.prompt(record, version, config["format"], notes, doc) for version in versions(config)] \
             if record.get("action") in pipeline.TO_LLM else []
         seconds = {"rewrite": asked["seconds"] if asked else None, "prepare": round(prepared, 2),
                    "prompt": round(time.time() - began - prepared, 3)}
@@ -187,7 +188,7 @@ def answer_pair(folder: Path, run_id: str, config: dict, model: str, version: st
     except LLMError as error:
         return f"skipped - probe failed: {str(error)[:150]}"
     for number, (run, record) in enumerate(jobs, 1):
-        built = pipeline.prompt(record, version, config["format"], config["gate"]["p_notes"])
+        built = pipeline.prompt(record, version, config["format"], config["gate"]["p_notes"], pipeline.document(config))
         started, began = now(), time.time()
         try:
             reply = chat_full(model, built["system"], built["prompt"], timeout=llm["timeout"], tries=llm["tries"])

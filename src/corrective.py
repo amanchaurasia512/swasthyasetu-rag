@@ -159,11 +159,13 @@ class Corrective:
         for hit, score in zip(pool, scores):
             hit["score"] = float(score)
         return sorted(pool, key=lambda h: -h["score"])[:k]
-
+    
     def refine(self, hits: list[dict], question: str) -> list[dict]:
+        """Keep the best sentences of long text chunks. A table chunk of any kind ('table', 'table_row', C-047) is
+        never cut: its cells are split by ';' and every value belongs to its row."""
         for hit in hits:
             sentences = [s.strip() for s in re.split(r"(?<=[.;?])\s+|\n+", hit["text"]) if s.strip()]
-            if hit["doc_type"] == "table" or len(sentences) <= 2 * KEEP_STRIPS + 1:
+            if hit["doc_type"].startswith("table") or len(sentences) <= 2 * KEEP_STRIPS + 1:
                 continue
             scores = list(self.R.reranker.rerank(question, sentences))
             top = sorted(range(len(sentences)), key=lambda i: -scores[i])[:KEEP_STRIPS]

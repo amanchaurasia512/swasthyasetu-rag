@@ -48,22 +48,27 @@ def question(source, qid, label, text, expected) -> dict:
 
 def load_questions(config: dict) -> list[dict]:
     """All questions in notebook 15.1's order (manual, set C, negatives), then an experiment's new set if it has one;
-    false premises the guideline can correct are answerable, with the correction as the expected answer (15.2b);
-    questions the experiment lists under 'removed' are left out."""
+    a document's experiment may have only some of these sets (C-044: NFHS-6 has only 'new'). False premises the
+    guideline can correct are answerable, with the correction as the expected answer (15.2b); questions the
+    experiment lists under 'removed' are left out."""
     sets = config["questions"]
-    manual, set_c, negatives = (read_table(path_of(sets[name]["file"])) for name in ("manual", "set_C", "negatives"))
-    corrections = {row.qid: PREMISE_PREFIX.sub("", row.reference_answer)
-                   for row in set_c[set_c.qid.isin(sets["premise_qids"])].itertuples()}
-    questions = (
-        [question("manual", row.qid, sets["manual"]["label"], row.question, row.expected_answer) for row in manual.itertuples()]
-        + [question("set_C", row.qid, SET_C_LABELS[row.expected], row.question,
-                    row.reference_answer if row.expected == "answer" else "") for row in set_c.itertuples()]
-        + [question("negatives", f"{sets['negatives']['qid_prefix']}{index:02d}", sets["negatives"]["label"], text, "")
-           for index, text in enumerate(negatives.question)])
-    if "new" in sets:
-        questions += [question("new", row.qid, row.label, row.question,
-                               row.expected_answer if row.label == "answerable" else "")
-                      for row in read_table(path_of(sets["new"]["file"])).itertuples()]
+    tables = {name: read_table(path_of(sets[name]["file"])) for name in ("manual", "set_C", "negatives", "new") if name in sets}
+    questions = []
+    if "manual" in tables:
+        questions += [question("manual", row.qid, sets["manual"]["label"], row.question, row.expected_answer)
+                      for row in tables["manual"].itertuples()]
+    if "set_C" in tables:
+        questions += [question("set_C", row.qid, SET_C_LABELS[row.expected], row.question,
+                               row.reference_answer if row.expected == "answer" else "") for row in tables["set_C"].itertuples()]
+    if "negatives" in tables:
+        questions += [question("negatives", f"{sets['negatives']['qid_prefix']}{index:02d}", sets["negatives"]["label"], text, "")
+                      for index, text in enumerate(tables["negatives"].question)]
+    if "new" in tables:
+        questions += [question("new", row.qid, row.label, row.question, row.expected_answer if row.label == "answerable" else "")
+                      for row in tables["new"].itertuples()]
+    set_c = tables.get("set_C")
+    corrections = {} if set_c is None else {row.qid: PREMISE_PREFIX.sub("", row.reference_answer)
+                                            for row in set_c[set_c.qid.isin(sets["premise_qids"])].itertuples()}
     removed = set(sets.get("removed", []))
     return [{**item, "label": "answerable", "expected": corrections[item["qid"]]} if item["qid"] in corrections else item
             for item in questions if item["qid"] not in removed]
@@ -95,8 +100,14 @@ def prompt_hash(system: str, user: str) -> str:
     """The same hash as E2's saved scoring input (C-003)."""
     return hashlib.sha256(f"{system}\n\n{user}".encode("utf-8")).hexdigest()[:12]
 
-def prompt(record: dict, version: str, fmt: str, notes: bool = True) -> dict:
-    """The exact prompt for one question, prompt version and format (notes: config gate.p_notes)."""
-    system, user = prompts.build(record, version, fmt, notes)
+def document(config: dict) -> dict:
+    """How the prompts name this run's document (C-040): title and not-found reply from config/docs/<doc>.yaml,
+    plus its prompt words (prompt.word, prompt.outside)."""
+    return {"title": config["title"], "not_found": config["not_found"], **config["prompt"]}
+
+
+def prompt(record: dict, version: str, fmt: str, notes: bool = True, doc: dict | None = None) -> dict:
+    """The exact prompt for one question, prompt version and format (notes: config gate.p_notes; doc: document(config))."""
+    system, user = prompts.build(record, version, fmt, notes, doc)
     return {"qid": record["qid"], "prompt_version": version, "format": fmt,
             "system": system, "prompt": user, "prompt_hash": prompt_hash(system, user)}

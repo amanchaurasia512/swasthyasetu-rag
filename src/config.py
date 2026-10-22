@@ -35,11 +35,11 @@ def merge(base: dict, override: dict) -> dict:
         merged[key] = merge(merged[key], value) if both_dicts else value
     return merged
 
-
-def load(experiment: str | Path | None = None, overrides: dict | None = None) -> dict:
-    """The merged settings for one run."""
+def load(experiment: str | Path | None = None, overrides: dict | None = None, doc: str | None = None) -> dict:
+    """The merged settings for one run. doc picks the document without an experiment file (C-040: build or check one
+    document's index); otherwise the experiment's 'docs' does, and the NHM document is the default."""
     run = read_yaml(ROOT / experiment) if experiment else {}
-    doc_id = (run.get("docs") or [DEFAULT_DOC])[0]
+    doc_id = doc or (run.get("docs") or [DEFAULT_DOC])[0]
     config = merge(read_yaml(CONFIG / "base.yaml"), read_yaml(CONFIG / "docs" / f"{doc_id}.yaml"))
     return merge(merge(config, run), overrides or {})
 

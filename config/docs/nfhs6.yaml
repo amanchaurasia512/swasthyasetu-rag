@@ -1,0 +1,21 @@
+# The second document (C-041): NFHS-6 (2023-24) fact sheets - India and 35 states/UTs, 101 indicators each.
+# Extracted by notebooks/16_nfhs6_chunks.ipynb (Docling + pdfplumber check), output in data/interim/nfhs6/.
+
+doc_id: nfhs6
+title: National Family Health Survey (NFHS-6), 2023-24 - Fact Sheets
+pdf: data/raw/National Family Health Survey (NFHS-6) 2023-2024 Fact Sheets.pdf
+
+files:
+  chunks: data/interim/nfhs6/chunks_rows.jsonl         # variant B: one chunk per indicator (+ 5 introduction chunks)
+  chunks_pages: data/interim/nfhs6/chunks_pages.jsonl  # variant A: one chunk per page (for the A/B/C comparison)
+  indicators: data/interim/nfhs6/nfhs6_indicators.csv  # every value with area, section, page and check status
+
+index:
+  vectordb: data/vectordb_nfhs6                        # its own folder: building it can never touch the NHM index
+  collection: nfhs6_rows_bge_small
+
+not_found: "Not found in the fact sheets."
+
+prompt:                                                # C-040: how the system prompts name this document
+  word: fact sheet                                     # "The fact sheet does not cover <it>."
+  outside: values from other surveys                   # "Do not add values from other surveys."
